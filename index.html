@@ -6,10 +6,10 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="PET单词">
+  <meta name="apple-mobile-web-app-title" content="希希词语家">
   <meta name="theme-color" content="#f7f8fc">
-  <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22PET%E5%8D%95%E8%AF%8D%22%2C%22short_name%22%3A%22PET%E5%8D%95%E8%AF%8D%22%2C%22start_url%22%3A%22.%2F%23%2Flearn%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23f7f8fc%22%2C%22theme_color%22%3A%22%23007aff%22%7D">
-  <title>PET单词 · 小小词语家</title>
+  <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22%E5%B8%8C%E5%B8%8C%E8%AF%8D%E8%AF%AD%E5%AE%B6%22%2C%22short_name%22%3A%22%E5%B8%8C%E5%B8%8C%E8%AF%8D%E8%AF%AD%E5%AE%B6%22%2C%22start_url%22%3A%22.%2F%23%2Flearn%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23f7f8fc%22%2C%22theme_color%22%3A%22%23007aff%22%7D">
+  <title>希希词语家</title>
   <style>
     :root {
       --primary: #007aff;
@@ -199,7 +199,7 @@
     .spell-example { color: var(--text-secondary); line-height: 1.55; font-size: 14px; }
     .spell-example strong { color: var(--text); }
     .mode-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 4px; margin: 20px 0 17px; border-radius: 13px; background: #f0f2f6; }
-    .mode-btn { min-height: 40px; border-radius: 10px; background: transparent; color: var(--text-secondary); font-size: 13px; font-weight: 750; }
+    .mode-btn { min-height: 44px; border-radius: 10px; background: transparent; color: var(--text-secondary); font-size: 13px; font-weight: 750; }
     .mode-btn.active { background: #fff; color: var(--primary); box-shadow: 0 2px 7px rgba(0,0,0,.08); }
     .spell-input { min-height: 62px; text-align: center; font-size: 25px; letter-spacing: .18em; font-weight: 750; border: 2px solid #cdd3de; }
     .spell-input.error { border-color: var(--danger); color: var(--danger); background: #fff7f7; animation: shake .3s ease-in-out; }
@@ -214,7 +214,7 @@
     .slot { width: 26px; height: 38px; display: grid; place-items: center; border-bottom: 3px solid #bfc5d0; font-size: 22px; font-weight: 800; text-transform: lowercase; }
     .slot.filled { color: var(--primary); border-color: var(--primary); }
     .letter-bank { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; padding: 18px 3px 5px; }
-    .letter-tile { min-width: 40px; min-height: 42px; padding: 5px 10px; border-radius: 11px; color: var(--text); background: #f0f3f8; border: 1px solid #dfe4ed; font-weight: 850; font-size: 18px; box-shadow: 0 2px 0 #d6dce5; }
+    .letter-tile { min-width: 44px; min-height: 44px; padding: 5px 10px; border-radius: 11px; color: var(--text); background: #f0f3f8; border: 1px solid #dfe4ed; font-weight: 850; font-size: 18px; box-shadow: 0 2px 0 #d6dce5; }
     .letter-tile.used { opacity: .34; transform: translateY(2px); box-shadow: none; }
     .spell-success { display: grid; place-items: center; text-align: center; padding: 45px 10px; }
     .success-icon { font-size: 76px; animation: pop .4s cubic-bezier(.175,.885,.32,1.275); }
@@ -233,7 +233,7 @@
     .admin-table th { color: var(--text-secondary); text-align: left; font-size: 12px; font-weight: 750; padding: 11px 9px; border-bottom: 1px solid var(--border); }
     .admin-table td { padding: 12px 9px; border-bottom: 1px solid #eef0f4; vertical-align: middle; }
     .table-actions { display: flex; gap: 6px; }
-    .mini-btn { min-width: 40px; min-height: 40px; padding: 6px 9px; border-radius: 10px; background: #f0f3f8; color: var(--text-secondary); font-size: 13px; font-weight: 750; }
+    .mini-btn { min-width: 44px; min-height: 44px; padding: 6px 9px; border-radius: 10px; background: #f0f3f8; color: var(--text-secondary); font-size: 13px; font-weight: 750; }
     .mini-btn.blue { color: var(--primary-dark); background: #eaf3ff; }
     .mini-btn.red { color: #c52c26; background: #fff0ef; }
     .preview-list { display: grid; gap: 8px; max-height: 330px; overflow: auto; }
@@ -250,6 +250,31 @@
     .import-options { display: grid; gap: 10px; margin-top: 18px; }
     .notice { padding: 13px 14px; color: #5c4a20; background: #fff8e5; border-radius: 13px; font-size: 13px; line-height: 1.6; }
     .privacy-note { color: var(--text-secondary); text-align: center; font-size: 12px; line-height: 1.6; margin-top: 18px; }
+    .coin-hero { padding: 22px; color: #fff; background: linear-gradient(145deg, #ffb300, #ff8a00 55%, #ff6b6b); border: 0; overflow: hidden; position: relative; }
+    .coin-hero::after { content: "希"; position: absolute; right: 18px; top: -18px; color: rgba(255,255,255,.14); font-size: 118px; font-weight: 900; transform: rotate(12deg); }
+    .coin-hero > * { position: relative; z-index: 1; }
+    .coin-hero .eyebrow { color: rgba(255,255,255,.82); }
+    .coin-number { font-size: 48px; line-height: 1; font-weight: 900; letter-spacing: -.06em; margin: 9px 0 6px; }
+    .coin-number span { font-size: 17px; letter-spacing: 0; opacity: .86; }
+    .growth-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .growth-stat { padding: 15px; border-radius: 16px; background: linear-gradient(145deg,#fff,#fff8ec); border: 1px solid #ffe8ba; }
+    .growth-stat .stat-number { color: #d87800; }
+    .growth-calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 7px; }
+    .calendar-day { min-height: 68px; display: grid; place-items: center; align-content: center; gap: 3px; border-radius: 13px; background: #f4f6f9; color: var(--text-secondary); font-size: 11px; }
+    .calendar-day.today { outline: 2px solid rgba(0,122,255,.45); outline-offset: 1px; }
+    .calendar-day.done { color: #a55b00; background: #fff1ce; }
+    .calendar-day .calendar-icon { font-size: 21px; line-height: 1; }
+    .word-row.clickable { cursor: pointer; transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease; }
+    .word-row.clickable:active { transform: scale(.985); }
+    .word-row.clickable:hover { border-color: #a9d2ff; box-shadow: 0 8px 20px rgba(0,122,255,.08); }
+    .word-row-actions { display: flex; align-items: center; gap: 5px; }
+    .word-row-actions .mini-btn { min-width: 40px; }
+    .word-card-modal { width: min(100%, 460px); max-height: 90vh; overflow: auto; padding: 22px; background: #fff; border-radius: 24px; box-shadow: 0 28px 80px rgba(13,26,56,.22); }
+    .word-card-modal .modal-visual { margin: 12px auto 16px; }
+    .word-card-modal .modal-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 20px; }
+    .word-card-modal .modal-actions .btn:last-child { grid-column: 1 / -1; }
+    .coin-pop { animation: coinPop .5s cubic-bezier(.175,.885,.32,1.275); }
+    @keyframes coinPop { 0% { transform: scale(.7) rotate(-8deg); opacity: .2; } 70% { transform: scale(1.08) rotate(2deg); } 100% { transform: scale(1) rotate(0); opacity: 1; } }
     @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
     @keyframes pop { 0% { transform: scale(.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; } }
@@ -269,7 +294,7 @@
       { word: 'advertisement', phonetic: '/ədˈvɜːtɪsmənt/', meaning: '广告', exampleEn: 'I saw an advertisement for a new smartphone on TV.', exampleCn: '我在电视上看到一则新智能手机的广告。', emoji: '📺', hint: 'ad-（向）+ vert（转）+ -ise（使）+ -ment（名词）→ 使目光转向 → 广告' },
       { word: 'celebrate', phonetic: '/ˈselɪbreɪt/', meaning: '庆祝', exampleEn: 'We celebrate Christmas every year.', exampleCn: '我们每年都庆祝圣诞节。', emoji: '🎉', hint: 'celebr（著名的）+ -ate（使）→ 使著名 → 庆祝' }
     ];
-    const DEFAULT_SETTINGS = { key: 'config', adminPassword: 'pet2024', dailyNew: 6, dailyReview: 6, soundEnabled: true, speechRate: 'normal' };
+    const DEFAULT_SETTINGS = { key: 'config', adminPassword: 'pet2024', dailyNew: 6, dailyReview: 6, soundEnabled: true, speechRate: 'normal', coins: 0, coinAwardedWordIds: [] };
     const EMOJI_MAP = {
       '住':'🏨','房':'🏠','家':'🏡','店':'🏪','宿':'🛏️','吃':'🍽️','食':'🍎','喝':'🥤','餐':'🍽️','饿':'😋','学':'📚','校':'🏫','书':'📖','读':'📖','教':'👨‍🏫','车':'🚗','路':'🛣️','走':'🚶','跑':'🏃','飞':'✈️','说':'💬','话':'🗣️','聊':'💭','讲':'🎤','喊':'📢','钱':'💰','买':'🛒','卖':'🏷️','付':'💳','贵':'💎','乐':'🎉','庆':'🎊','喜':'😊','笑':'😄','哭':'😢','工':'💼','作':'📝','业':'📋','职':'💼','忙':'⏰','医':'🏥','病':'🤒','药':'💊','痛':'😣','健':'💪','旅':'✈️','游':'🏖️','行':'🧳','景':'🏞️','玩':'🎮','爱':'❤️','情':'💕','友':'👫','亲':'👨‍👩‍👧','冷':'❄️','热':'☀️','雨':'🌧️','雪':'❄️','风':'💨','大':'⬆️','小':'⬇️','高':'📈','低':'📉','新':'✨','老':'👴','好':'👍','坏':'👎','美':'💄','丑':'🤡','快':'⚡','慢':'🐢','早':'🌅','晚':'🌙','default':'📌'
     };
@@ -340,7 +365,7 @@
       route: '/learn', currentUser: 'child', today: todayKey(), settings: { ...DEFAULT_SETTINGS }, words: [], logs: [],
       currentTask: null, guidePage: 0, showGuide: false, stageAReadyAt: 0, stageAFlipped: false, stageB: null, spell: null, weeklyTest: null,
       adminTab: 'overview', adminLoggedIn: false, adminSearch: '', adminPage: 1, editingWordId: null, batchPreview: [], importPayload: null,
-      wordSearch: '', batchText: '', batchLookupRunning: false, ocrStatus: '', toastTimer: null
+      wordSearch: '', batchText: '', batchLookupRunning: false, ocrStatus: '', selectedWordId: null, toastTimer: null
     };
 
     /** 读取本地数据，并在首次启动时写入示例词。 */
@@ -363,6 +388,19 @@
       localStorage.setItem('petSixTaskDefaultsApplied', 'true');
       if (!savedSettings) await DB.put('settings', State.settings);
       State.logs = await DB.all('dailyLog');
+      /* 旧版本没有希币字段：已完成过的新词按“每词1希币”初始化一次，避免升级后积分丢失。 */
+      const savedCoinIds = Array.isArray(State.settings.coinAwardedWordIds) ? State.settings.coinAwardedWordIds : [];
+      const historicalIds = unique(State.logs.flatMap(log => log.wordsStudied || [])).filter(id => State.words.some(word => word.id === id));
+      const mergedCoinIds = unique([...savedCoinIds, ...historicalIds]);
+      const expectedCoins = Math.max(Number(State.settings.coins) || 0, mergedCoinIds.length);
+      if (mergedCoinIds.length !== savedCoinIds.length || expectedCoins !== Number(State.settings.coins || 0)) {
+        State.settings.coinAwardedWordIds = mergedCoinIds;
+        State.settings.coins = expectedCoins;
+        await DB.put('settings', State.settings);
+      } else {
+        State.settings.coinAwardedWordIds = mergedCoinIds;
+        State.settings.coins = expectedCoins;
+      }
       State.showGuide = localStorage.getItem('petWelcomeSeen') !== 'true';
     }
 
@@ -379,7 +417,7 @@
       const masteredFallback = State.words.filter(word => word.status === 'mastered' && !due.some(item => item.id === word.id) && !completedReview.includes(word.id)).sort((a,b) => (a.lastReview || 0) - (b.lastReview || 0));
       const plannedNew = log?.plannedNew || newPool.slice(0, State.settings.dailyNew).map(word => word.id);
       const plannedReview = log?.plannedReview || [...due, ...masteredFallback].slice(0, State.settings.dailyReview).map(word => word.id);
-      const nextLog = { date: State.today, wordsStudied: completedNew, wordsReviewed: completedReview, durationMinutes: log?.durationMinutes || 0, completed: log?.completed || false, plannedNew, plannedReview, dailyNew: State.settings.dailyNew, dailyReview: State.settings.dailyReview, weeklyTestCompleted: log?.weeklyTestCompleted || false, weeklyTestMeaningScore: log?.weeklyTestMeaningScore || 0, weeklyTestSpellingScore: log?.weeklyTestSpellingScore || 0 };
+      const nextLog = { date: State.today, wordsStudied: completedNew, wordsReviewed: completedReview, coinsEarned: log?.coinsEarned || 0, durationMinutes: log?.durationMinutes || 0, completed: log?.completed || false, plannedNew, plannedReview, dailyNew: State.settings.dailyNew, dailyReview: State.settings.dailyReview, weeklyTestCompleted: log?.weeklyTestCompleted || false, weeklyTestMeaningScore: log?.weeklyTestMeaningScore || 0, weeklyTestSpellingScore: log?.weeklyTestSpellingScore || 0 };
       if (log?.id !== undefined) nextLog.id = log.id;
       await DB.put('dailyLog', nextLog); State.logs = await DB.all('dailyLog'); return nextLog;
     }
@@ -890,6 +928,9 @@
     document.addEventListener('click', async (event) => {
       const target = event.target.closest('[data-action]'); if (!target) return; const action = target.dataset.action;
       if (action === 'navigate') { Router.navigate(target.dataset.path); return; }
+      if (action === 'open-word-card') { const word = State.words.find(item => item.id === Number(target.dataset.id)); if (word) { State.selectedWordId = word.id; render(); } return; }
+      if (action === 'close-word-card') { State.selectedWordId = null; render(); return; }
+      if (action === 'modal-noop') return;
       if (action === 'open-admin-tab') { State.adminTab = target.dataset.tab || 'overview'; if (State.route === '/admin') render(); else Router.navigate('/admin'); return; }
       if (action === 'skip-guide') { setGuideSeen(); return; }
       if (action === 'next-guide') { if (State.guidePage < 2) { State.guidePage++; render(); } else setGuideSeen(); return; }
@@ -934,8 +975,8 @@
       if (action === 'parse-batch') { State.batchText = $('[data-input="batch-text"]')?.value || State.batchText; State.batchPreview = parseBatchInput(State.batchText); render(); if (!State.batchPreview.length) showToast('没有识别到单词，请检查格式'); else lookupBatchOnline(); return; }
       if (action === 'save-batch') { await saveBatchInput(); return; }
       if (action === 'cancel-edit') { State.editingWordId = null; render(); return; }
-      if (action === 'edit-word') { State.editingWordId = Number(target.dataset.id); State.adminTab = 'add'; render(); return; }
-      if (action === 'delete-word') { const word = State.words.find(item => item.id === Number(target.dataset.id)); if (word && confirm(`确定删除 “${word.word}” 吗？`)) { await DB.delete('words', word.id); State.words = await DB.all('words'); showToast('单词已删除'); render(); } return; }
+      if (action === 'edit-word') { State.editingWordId = Number(target.dataset.id); State.selectedWordId = null; State.adminTab = 'add'; if (State.route === '/admin') render(); else Router.navigate('/admin'); return; }
+      if (action === 'delete-word') { await removeWord(Number(target.dataset.id)); return; }
       if (action === 'reset-word') { const word = State.words.find(item => item.id === Number(target.dataset.id)); if (word) { await Scheduler.updateWord(word, { status:'new', reviewCount:0, lastReview:0, nextReview:0, errorCount:0, correctStreak:0, successfulReviewStreak:0 }); showToast('学习进度已重置'); render(); } return; }
       if (action === 'admin-page') { State.adminPage += Number(target.dataset.delta); render(); return; }
       if (action === 'export-data') { exportData(); return; }
@@ -951,6 +992,120 @@
     async function saveBatch() { const existingWords = new Set(State.words.map(word => word.word.toLowerCase())); let added = 0; for (const item of State.batchPreview) { if (existingWords.has(item.word.toLowerCase())) continue; await DB.put('words', { ...item, status:'new', reviewCount:0, lastReview:0, nextReview:0, errorCount:0, createdAt:Date.now() + added }); added++; } State.words = await DB.all('words'); State.batchPreview = []; showToast(added ? `已录入 ${added} 个单词` : '重复单词已跳过'); render(); }
     function exportData() { const payload = { exportedAt: new Date().toISOString(), words: State.words, settings: State.settings, dailyLog: State.logs }; const blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `pet-word-backup-${todayKey()}.json`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); showToast('备份文件已下载'); }
     async function importData(mode) { const payload = State.importPayload; if (!payload) return; if (mode === 'overwrite') { await DB.clear('words'); await DB.clear('dailyLog'); await DB.bulkPut('words', payload.words || []); await DB.bulkPut('dailyLog', payload.dailyLog || []); if (payload.settings) await DB.put('settings', { ...DEFAULT_SETTINGS, ...payload.settings }); } else { const currentByWord = new Map(State.words.map(word => [word.word.toLowerCase(), word])); for (const incoming of payload.words || []) { const existing = currentByWord.get(String(incoming.word || '').toLowerCase()); if (existing && mode === 'skip') continue; await DB.put('words', existing ? { ...existing, ...incoming, id: existing.id } : { ...incoming, id: undefined }); } if (payload.settings && mode === 'merge') await DB.put('settings', { ...State.settings, ...payload.settings, key:'config' }); if (mode === 'merge') for (const incoming of payload.dailyLog || []) { const existing = State.logs.find(log => log.date === incoming.date); await DB.put('dailyLog', existing ? { ...existing, ...incoming, id:existing.id } : { ...incoming, id:undefined }); } } State.words = await DB.all('words'); State.logs = await DB.all('dailyLog'); const saved = await DB.get('settings','config'); State.settings = { ...DEFAULT_SETTINGS, ...(saved || {}) }; State.importPayload = null; showToast('数据恢复完成'); render(); }
+
+    /* ==================== 希币成长、单词卡与儿童界面增强 ==================== */
+    /** 返回一个可用于成长统计的日期键集合；只把真正学习过的日期算作打卡日。 */
+    function studyDaySet() {
+      return new Set(State.logs.filter(log => log.completed || (log.wordsStudied || []).length || (log.wordsReviewed || []).length || (log.coinsEarned || 0) > 0).map(log => log.date));
+    }
+    function dateKeyFromDate(date) { return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`; }
+    function streakInfo() {
+      const days = studyDaySet();
+      let current = 0;
+      const cursor = new Date(`${State.today}T12:00:00`);
+      while (days.has(dateKeyFromDate(cursor))) { current++; cursor.setDate(cursor.getDate() - 1); }
+      const ordered = [...days].sort();
+      let longest = 0; let run = 0; let previous = null;
+      for (const key of ordered) {
+        const stamp = dateStart(key);
+        if (previous !== null && stamp - previous === 86400000) run++;
+        else run = 1;
+        longest = Math.max(longest, run); previous = stamp;
+      }
+      return { current, longest, days };
+    }
+    /** 本周统计同时服务于首页、成长页和图表。 */
+    function weekStats() {
+      const now = new Date(`${State.today}T12:00:00`);
+      const day = (now.getDay() + 6) % 7;
+      const start = new Date(now); start.setDate(now.getDate() - day); start.setHours(0, 0, 0, 0);
+      const keys = []; for (let i = 0; i < 7; i++) { const date = new Date(start); date.setDate(start.getDate() + i); keys.push(dateKeyFromDate(date)); }
+      const logs = State.logs.filter(log => keys.includes(log.date));
+      const studied = unique(logs.flatMap(log => log.wordsStudied || []));
+      return { completed: Math.min(30, studied.length), days: logs.filter(log => log.completed || (log.wordsStudied || []).length || (log.wordsReviewed || []).length).length, keys, logs, coins: logs.reduce((sum, log) => sum + (log.coinsEarned || 0), 0) };
+    }
+    function growthStats() {
+      const streak = streakInfo(); const week = weekStats();
+      return { coins: Number(State.settings.coins || 0), todayCoins: currentLog()?.coinsEarned || 0, weekCoins: week.coins, studied: unique(State.logs.flatMap(log => log.wordsStudied || [])).length, streak: streak.current, longestStreak: streak.longest, week };
+    }
+    /** 完成新词拼写时只为这个词发放一次希币，重复复习不会刷分。 */
+    async function finishWord() {
+      const task = State.currentTask; const word = currentWord(); if (!task || !word) return;
+      const wasReview = task.type === 'review';
+      let patch = { lastReview: Date.now(), reviewCount: (word.reviewCount || 0) + (wasReview ? 1 : 0), nextReview: Scheduler.calculateNextReview(word, true) };
+      if (!wasReview) patch = { ...patch, status: word.status === 'struggling' || task.spellAttempts >= 3 ? 'struggling' : (task.selfKnown ? 'learning' : 'struggling'), nextReview: tomorrowStart() };
+      else if (word.status === 'struggling') patch = { ...patch, status: (word.successfulReviewStreak || 0) + 1 >= 2 ? 'learning' : 'struggling', successfulReviewStreak: (word.successfulReviewStreak || 0) + 1 };
+      else if (word.status === 'learning') { const correctStreak = (word.correctStreak || 0) + 1; patch = { ...patch, correctStreak, status: correctStreak >= 3 ? 'mastered' : 'learning', nextReview: correctStreak >= 3 ? Date.now() + 3 * 86400000 : tomorrowStart(), masteredInterval: 3 }; }
+      await Scheduler.updateWord(word, patch);
+      let coinEarned = false;
+      if (!wasReview) {
+        const awarded = new Set(Array.isArray(State.settings.coinAwardedWordIds) ? State.settings.coinAwardedWordIds : []);
+        if (!awarded.has(word.id)) { awarded.add(word.id); State.settings.coinAwardedWordIds = [...awarded]; State.settings.coins = Number(State.settings.coins || 0) + 1; await DB.put('settings', State.settings); coinEarned = true; }
+      }
+      const log = currentLog() || { date: State.today, wordsStudied: [], wordsReviewed: [], durationMinutes: 0, plannedNew: [], plannedReview: [], coinsEarned: 0 };
+      const key = wasReview ? 'wordsReviewed' : 'wordsStudied'; log[key] = unique([...(log[key] || []), word.id]); log.coinsEarned = (log.coinsEarned || 0) + (coinEarned ? 1 : 0);
+      log.durationMinutes = Math.max(log.durationMinutes || 0, Math.round((Date.now() - (task.startedAt || Date.now())) / 60000));
+      log.completed = (log.wordsStudied || []).length >= (log.plannedNew || []).length && (log.wordsReviewed || []).length >= (log.plannedReview || []).length;
+      await DB.put('dailyLog', log); State.logs = await DB.all('dailyLog'); State.spell.success = true; renderLearning();
+      showToast(coinEarned ? '拼写正确！获得1枚希币 🪙' : '拼写正确！继续保持 🌟');
+      if (log.completed) setTimeout(() => { Animations.confetti(); showToast('今日完成！明天见 🌟'); }, 450);
+    }
+    /** 删除单词及其计划、学习记录引用；确认后才执行，避免儿童误触。 */
+    async function removeWord(id) {
+      const word = State.words.find(item => item.id === id); if (!word) return;
+      if (!confirm(`确定删除“${word.word}”吗？这会同时移除它的学习记录。`)) return;
+      const awarded = new Set(Array.isArray(State.settings.coinAwardedWordIds) ? State.settings.coinAwardedWordIds : []);
+      const wasAwarded = awarded.has(id);
+      await DB.delete('words', id);
+      for (const log of State.logs) {
+        const studied = log.wordsStudied || []; const reviewed = log.wordsReviewed || [];
+        const next = { ...log, wordsStudied: studied.filter(item => item !== id), wordsReviewed: reviewed.filter(item => item !== id), plannedNew: (log.plannedNew || []).filter(item => item !== id), plannedReview: (log.plannedReview || []).filter(item => item !== id) };
+        if (wasAwarded && studied.includes(id)) next.coinsEarned = Math.max(0, (log.coinsEarned || 0) - 1);
+        if (JSON.stringify(next) !== JSON.stringify(log)) await DB.put('dailyLog', next);
+      }
+      if (wasAwarded) { State.settings.coinAwardedWordIds = [...awarded].filter(item => item !== id); State.settings.coins = Math.max(0, Number(State.settings.coins || 0) - 1); await DB.put('settings', State.settings); }
+      State.words = await DB.all('words'); State.logs = await DB.all('dailyLog'); State.batchPreview = State.batchPreview.filter(item => item.word.toLowerCase() !== word.word.toLowerCase()); State.selectedWordId = null; State.editingWordId = null;
+      if (State.currentTask?.wordId === id) { State.currentTask = null; State.spell = null; }
+      showToast('单词和相关记录已删除'); render();
+    }
+    function renderWordCardModal() {
+      const word = State.words.find(item => item.id === State.selectedWordId); if (!word) return '';
+      const reference = word.referenceUrl || `${CAMBRIDGE_REFERENCE}${encodeURIComponent(word.word.toLowerCase().replace(/\s+/g, '-'))}`;
+      return `<div class="modal-backdrop" data-action="close-word-card"><article class="word-card-modal" data-action="modal-noop"><div class="row between"><div class="eyebrow">单词卡</div><button class="icon-btn" data-action="close-word-card" aria-label="关闭单词卡">×</button></div><div class="modal-visual">${wordVisual(word, 'visual-word')}</div><h1 style="text-align:center;word-break:break-word">${escapeHtml(word.word)}</h1><div class="phonetic" style="text-align:center">${escapeHtml(word.phonetic || '音标待补充')}</div><div class="row" style="justify-content:center;margin-top:15px"><button class="btn speak-btn" data-action="speak" data-id="${word.id}">🔊 听完整发音</button>${statusBadge(word)}</div><div class="meaning-large" style="margin-top:23px">${escapeHtml(word.meaning || '中文释义待补充')}</div>${word.exampleEn ? `<div class="example-en">${highlightWord(word.exampleEn, word.word)}</div>` : '<div class="muted small">还没有英文例句</div>'}${word.exampleCn ? `<div class="example-cn">${escapeHtml(word.exampleCn)}</div>` : ''}${word.hint ? `<div class="hint-box">💡 <strong>记忆小提示</strong><br>${escapeHtml(word.hint)}</div>` : ''}<div class="modal-actions"><button class="btn btn-primary" data-action="edit-word" data-id="${word.id}">✏️ 编辑这个词</button><button class="btn btn-danger" data-action="delete-word" data-id="${word.id}">🗑️ 删除这个词</button><a class="btn btn-secondary" href="${escapeHtml(reference)}" target="_blank" rel="noopener">📖 查看词典参考</a></div></article></div>`;
+    }
+    function renderGrowthCalendar() {
+      const week = weekStats(); const labels = ['一','二','三','四','五','六','日'];
+      return `<div class="growth-calendar">${week.keys.map((key, index) => { const log = week.logs.find(item => item.date === key); const done = log && (log.completed || (log.wordsStudied || []).length || (log.wordsReviewed || []).length); return `<div class="calendar-day ${done ? 'done' : ''} ${key === State.today ? 'today' : ''}"><strong>周${labels[index]}</strong><span>${escapeHtml(key.slice(5))}</span><span class="calendar-icon">${done ? '⭐' : '·'}</span><span>${log?.coinsEarned || 0} 希币</span></div>`; }).join('')}</div>`;
+    }
+    function navBar() {
+      const current = State.route; const toolActive = current === '/admin';
+      return `<nav class="nav-bar" aria-label="主导航"><button class="nav-item ${current === '/learn' ? 'active' : ''}" data-action="navigate" data-path="/learn"><span class="nav-icon">📖</span><span>学习</span></button><button class="nav-item ${current === '/words' ? 'active' : ''}" data-action="navigate" data-path="/words"><span class="nav-icon">📋</span><span>词库</span></button><button class="nav-item ${toolActive && State.adminTab === 'add' ? 'active' : ''}" data-action="open-admin-tab" data-tab="add"><span class="nav-icon">➕</span><span>录入</span></button><button class="nav-item ${toolActive && State.adminTab === 'overview' ? 'active' : ''}" data-action="open-admin-tab" data-tab="overview"><span class="nav-icon">🪙</span><span>成长</span></button><button class="nav-item ${current === '/profile' ? 'active' : ''}" data-action="navigate" data-path="/profile"><span class="nav-icon">👤</span><span>我的</span></button></nav>`;
+    }
+    function renderDashboard() {
+      const log = currentLog() || { wordsStudied: [], wordsReviewed: [] }; const newWords = (log.plannedNew || []).map(id => State.words.find(word => word.id === id)).filter(Boolean); const reviewWords = (log.plannedReview || []).map(id => State.words.find(word => word.id === id)).filter(Boolean); const newDone = (log.wordsStudied || []).length; const reviewDone = (log.wordsReviewed || []).length; const dailyDone = newDone >= newWords.length && reviewDone >= reviewWords.length; const week = weekStats(); const growth = growthStats(); const percent = Math.min(100, Math.round(week.completed / 30 * 100));
+      return `<section class="screen"><header class="topbar"><div class="brand-lockup"><div class="brand-mark">📗</div><div><div class="brand-title">希希词语家</div><div class="brand-subtitle">PET Vocabulary · 今日 ${escapeHtml(State.today.slice(5).replace('-', '月'))} 日</div></div></div></header><div class="stack"><section class="card hero-card"><div class="eyebrow">本周学习进度</div><div class="hero-number">${week.completed}<span> / 30 个词</span></div><div>每天一点点，词汇会长大 🌱</div><div class="progress-track"><div class="progress-fill" style="width:${percent}%"></div></div><div class="progress-meta"><span>${week.completed ? `已经坚持 ${week.days} 天` : '今天也来学一点'}</span><span>${percent}%</span></div></section><section class="card coin-hero"><div class="eyebrow">个人打卡榜 · 我的希币</div><div class="coin-number">${growth.coins}<span> 希币</span></div><div>积分 ${growth.coins} 分 · 今天 +${growth.todayCoins} 希币</div><button class="btn" style="margin-top:15px;color:#9a5600;background:#fff" data-action="open-admin-tab" data-tab="overview">查看成长榜 →</button></section><section class="stack"><div class="section-heading"><h2>今天学什么</h2><span class="badge ${dailyDone ? 'green' : 'blue'}">${dailyDone ? '全部完成' : `${newDone + reviewDone} / ${newWords.length + reviewWords.length}`}</span></div><article class="card task-card new-task"><div class="row between"><div class="task-icon">📘</div>${newDone >= newWords.length ? '<span class="task-status">已完成 ✅</span>' : '<span class="task-status pending">新词任务</span>'}</div><div><div class="task-title">今日新学 · ${newWords.length} 个</div><div class="task-caption">${newWords.length ? '认识新朋友，完成拼写就能获得希币。' : '词库里暂时没有待学习的新词。'}</div></div>${newWords.length ? `<div class="word-preview">${newWords.map(word => escapeHtml(word.word)).join(' · ')}</div>` : ''}<button class="btn ${newDone >= newWords.length ? 'btn-secondary' : 'btn-primary'} btn-block" data-action="start-task" data-type="new" ${newDone >= newWords.length ? 'disabled' : ''}>${newDone >= newWords.length ? '新词已学完' : '开始新词学习 →'}</button></article><article class="card task-card review-task ${newDone < newWords.length ? 'locked' : ''}"><div class="row between"><div class="task-icon">📙</div>${reviewDone >= reviewWords.length ? '<span class="task-status">已完成 ✅</span>' : newDone < newWords.length ? '<span class="task-status lock">🔒 待解锁</span>' : '<span class="task-status pending">复习任务</span>'}</div><div><div class="task-title">今日复习 · ${reviewWords.length} 个</div><div class="task-caption">${newDone < newWords.length ? '完成今日新词后，就能开始复习啦。' : reviewWords.length ? '把学过的单词再叫醒一次。' : '今天没有到期复习词，轻松完成！'}</div></div><button class="btn ${newDone < newWords.length || reviewDone >= reviewWords.length ? 'btn-secondary' : 'btn-warning'} btn-block" data-action="start-task" data-type="review" ${newDone < newWords.length || reviewDone >= reviewWords.length ? 'disabled' : ''}>${reviewDone >= reviewWords.length ? '复习已完成' : newDone < newWords.length ? '完成新词后解锁' : '开始复习 →'}</button></article></section>${renderWeeklyTestCard(getWeeklyTestWords())}<section class="card card-pad"><div class="row between"><div><h3>${dailyDone ? '今日完成！明天见 🌟' : '准备好了吗？'}</h3><p class="muted small" style="margin-top:6px">${dailyDone ? '你的学习和希币都已经被记录下来。' : '每个新词完成拼写后，会获得1枚希币。'}</p></div><div style="font-size:35px">${dailyDone ? '🎉' : '🧠'}</div></div></section></div>${navBar()}</section>`;
+    }
+    function renderWords() {
+      const query = State.wordSearch.trim().toLowerCase(); const words = State.words.filter(word => !query || word.word.toLowerCase().includes(query) || String(word.meaning || '').includes(query));
+      return `<section class="screen">${pageTop('词库', `${State.words.length} 个单词`)}<div class="stack"><div class="search-box"><span>⌕</span><input class="input" style="padding-left:42px" data-input="word-search" value="${escapeHtml(State.wordSearch)}" placeholder="搜索英文、短语或中文释义" aria-label="搜索词库"></div><div class="row between"><div><h2>我的单词本</h2><p class="muted tiny" style="margin-top:5px">点击单词查看完整单词卡</p></div><span class="muted small">${words.length} 个结果</span></div><div class="word-list">${words.length ? words.map(word => `<article class="word-row clickable" data-action="open-word-card" data-id="${word.id}">${wordVisual(word)}<div style="min-width:0"><div class="row" style="gap:7px;flex-wrap:wrap"><span class="word-name">${escapeHtml(word.word)}</span>${statusBadge(word)}</div><div class="word-meaning">${escapeHtml(word.meaning || '中文释义待补充')}${word.phonetic ? ` · ${escapeHtml(word.phonetic)}` : ''}</div></div><div class="word-row-actions"><button class="mini-btn" data-action="speak" data-id="${word.id}" aria-label="朗读 ${escapeHtml(word.word)}">🔊</button><button class="mini-btn blue" data-action="edit-word" data-id="${word.id}">编辑</button><button class="mini-btn red" data-action="delete-word" data-id="${word.id}">删除</button></div></article>`).join('') : '<div class="card empty"><div class="empty-icon">🔎</div><p>没有找到相关单词</p><p class="small" style="margin-top:6px">试试搜索另一个词吧。</p></div>'}</div></div>${navBar()}</section>`;
+    }
+    function renderProfile() {
+      const stats = profileStats(); const growth = growthStats(); const ring = Math.min(100, Math.round(growth.week.completed / 30 * 100));
+      return `<section class="screen">${pageTop('我的', '看看自己的成长')}<div class="stack"><section class="card card-pad profile-hero"><div class="avatar">🧒</div><div><h2>希希小探险家</h2><p class="muted small" style="margin-top:6px">${growth.streak >= 3 ? '连续学习真厉害！' : '今天也要加油呀！'}</p></div><div class="progress-ring" style="--ring:${ring}%"><span>${ring}%</span></div></section><section class="card coin-hero"><div class="eyebrow">个人打卡榜</div><div class="coin-number">${growth.coins}<span> 希币</span></div><p>积分 ${growth.coins} 分 · 累计学习 ${growth.studied} 个词</p><button class="btn" style="margin-top:14px;color:#9a5600;background:#fff" data-action="open-admin-tab" data-tab="overview">查看完整成长记录</button></section><section class="streak-row"><div class="stat"><div class="stat-number">${stats.mastered}</div><div class="stat-label">掌握单词</div></div><div class="stat"><div class="stat-number">${growth.streak}🔥</div><div class="stat-label">连续打卡</div></div><div class="stat"><div class="stat-number">${stats.minutes}</div><div class="stat-label">学习分钟</div></div></section>${growth.streak >= 3 ? '<section class="card card-pad" style="background:linear-gradient(135deg,#fff8df,#fff)"><div class="row"><div style="font-size:42px">🏅</div><div><h3>三日坚持徽章</h3><p class="muted small" style="margin-top:5px">连续三天完成任务，继续保持！</p></div></div></section>' : ''}<section class="card card-pad"><div class="section-heading" style="margin:0 0 4px"><h3>每日任务数量</h3><span class="badge blue">可随时调整</span></div><p class="muted small" style="line-height:1.6;margin-top:6px">建议每天新学和复习数量相同。修改后会重新安排今天尚未完成的任务。</p><div class="field-grid two" style="margin-top:15px"><label class="field"><span>每日新学</span><input class="input" type="number" min="1" max="30" inputmode="numeric" data-input="daily-new" value="${State.settings.dailyNew}"></label><label class="field"><span>每日复习</span><input class="input" type="number" min="0" max="30" inputmode="numeric" data-input="daily-review" value="${State.settings.dailyReview}"></label></div></section><section class="card card-pad"><div class="section-heading" style="margin:0 0 4px"><h3>学习偏好</h3><span class="badge blue">本机保存</span></div><div class="switch-line"><div><strong>学习语音</strong><div class="muted tiny" style="margin-top:4px">朗读单词、例句和中文释义</div></div><button class="switch ${State.settings.soundEnabled ? 'on' : ''}" data-action="toggle-sound" aria-label="切换语音"><i></i></button></div><div class="switch-line"><div><strong>朗读速度</strong><div class="muted tiny" style="margin-top:4px">选择适合自己的节奏</div></div><select class="select" style="width:130px;min-height:42px" data-input="speech-rate"><option value="slow" ${State.settings.speechRate === 'slow' ? 'selected' : ''}>慢一点</option><option value="normal" ${State.settings.speechRate === 'normal' ? 'selected' : ''}>正常</option><option value="fast" ${State.settings.speechRate === 'fast' ? 'selected' : ''}>快一点</option></select></div></section><section class="card card-pad"><div class="row between"><div><h3>数据与工具</h3><p class="muted small" style="margin-top:6px">录入词库、查看成长榜和备份数据</p></div><button class="btn btn-secondary" data-action="open-admin-tab" data-tab="add">打开工具</button></div></section><p class="privacy-note">学习记录保存在这台设备上。在线补全、拍照识别和正规词典参考需要联网。</p></div>${navBar()}</section>`;
+    }
+    function renderAdminOverview() {
+      const growth = growthStats(); const hard = [...State.words].sort((a,b) => (b.errorCount || 0) - (a.errorCount || 0)).slice(0,5); const target = Math.max(1, State.settings.dailyNew * 6); const progress = Math.min(100, Math.round(growth.weekCoins / target * 100));
+      return `<div class="admin-layout"><div class="stack"><section class="card coin-hero"><div class="eyebrow">个人打卡榜 · 当前排名 #1</div><div class="coin-number coin-pop">${growth.coins}<span> 希币</span></div><div>积分 ${growth.coins} 分 · 每完成一个新词获得1分</div><div class="progress-track"><div class="progress-fill" style="width:${progress}%"></div></div><div class="progress-meta"><span>本周获得 ${growth.weekCoins} 希币</span><span>${progress}%</span></div></section><section class="growth-grid"><div class="growth-stat"><div class="stat-number">${growth.todayCoins}</div><div class="stat-label">今日希币</div></div><div class="growth-stat"><div class="stat-number">${growth.weekCoins}</div><div class="stat-label">本周希币</div></div><div class="growth-stat"><div class="stat-number">${growth.streak}🔥</div><div class="stat-label">连续打卡</div></div><div class="growth-stat"><div class="stat-number">${growth.studied}</div><div class="stat-label">累计学习词数</div></div></section><section class="card card-pad"><div class="row between" style="margin-bottom:13px"><div><div class="eyebrow">本周打卡</div><h2 style="margin-top:7px">每天都有小进步</h2></div><span class="badge orange">本周 ${growth.week.days} 天</span></div>${renderGrowthCalendar()}</section><section class="card card-pad"><div class="row between" style="margin-bottom:13px"><h2>易错词 Top 5</h2><span class="badge orange">只用于排序</span></div>${hard.length ? `<div class="word-list">${hard.map((word, index) => `<div class="row between" style="padding:11px 0;border-bottom:1px solid var(--border);cursor:pointer" data-action="open-word-card" data-id="${word.id}"><div class="row"><span style="width:24px;color:var(--text-secondary);font-weight:800">${index + 1}</span>${wordVisual(word)}<div><strong>${escapeHtml(word.word)}</strong><div class="muted tiny" style="margin-top:3px">${escapeHtml(word.meaning)}</div></div></div><span class="badge orange">${word.errorCount || 0} 次</span></div>`).join('')}</div>` : '<div class="empty">还没有错误记录，继续保持！</div>'}</section></div><div class="stack"><section class="card card-pad"><div class="eyebrow">本周学习趋势</div><div class="canvas-wrap" style="margin-top:12px"><canvas id="weeklyChart" width="800" height="360"></canvas></div></section><section class="card card-pad"><h3>快速入口</h3><div class="stack" style="gap:9px;margin-top:14px"><button class="btn btn-secondary btn-block" data-action="admin-tab" data-tab="add">添加新词 →</button><button class="btn btn-secondary btn-block" data-action="admin-tab" data-tab="manage">编辑或删除词库 →</button><button class="btn btn-secondary btn-block" data-action="admin-tab" data-tab="backup">导出备份 →</button></div></section><section class="card card-pad"><div class="eyebrow">成长小目标</div><h3 style="margin-top:7px">${growth.longestStreak >= 7 ? '已经连续坚持一周啦！🎉' : growth.streak >= 3 ? '三天坚持徽章已点亮！🏅' : '先完成连续3天学习吧！'}</h3><p class="muted small" style="margin-top:7px;line-height:1.6">完成新词并通过拼写，就会为自己的成长榜增加希币。</p></section></div></div>`;
+    }
+    function renderAdmin() {
+      const body = State.adminTab === 'overview' ? renderAdminOverview() : State.adminTab === 'add' ? renderAdminAdd() : State.adminTab === 'manage' ? renderAdminManage() : renderAdminBackup();
+      return `<section class="screen admin-screen"><header class="topbar"><div class="brand-lockup"><div class="brand-mark">🪙</div><div><div class="brand-title">成长与工具</div><div class="brand-subtitle">希希词语家 · ${State.words.length} 个词</div></div></div><button class="icon-btn" data-action="navigate" data-path="/learn" aria-label="返回学习">←</button></header><nav class="admin-nav"><button class="admin-tab ${State.adminTab === 'overview' ? 'active' : ''}" data-action="admin-tab" data-tab="overview">🪙 个人成长榜</button><button class="admin-tab ${State.adminTab === 'add' ? 'active' : ''}" data-action="admin-tab" data-tab="add">➕ 录入词库</button><button class="admin-tab ${State.adminTab === 'manage' ? 'active' : ''}" data-action="admin-tab" data-tab="manage">📚 管理词库</button><button class="admin-tab ${State.adminTab === 'backup' ? 'active' : ''}" data-action="admin-tab" data-tab="backup">💾 备份恢复</button></nav>${body}${State.importPayload ? renderImportModal() : ''}${navBar()}</section>`;
+    }
+    function render() {
+      const app = $('#app'); if (!app) return; let html = '';
+      if (State.route === '/learn') html = renderDashboard(); if (State.route === '/words') html = renderWords(); if (State.route === '/profile') html = renderProfile(); if (State.route === '/admin') html = renderAdmin(); if (State.route === '/test') html = renderWeeklyTest();
+      app.innerHTML = html; if (State.selectedWordId && State.route !== '/test') app.insertAdjacentHTML('beforeend', renderWordCardModal()); if (State.showGuide && State.route !== '/admin' && State.route !== '/test' && !State.selectedWordId) renderGuide(); drawChart();
+    }
 
     /* ==================== 动画与启动 ==================== */
     const Animations = { confetti() { const canvas = $('#confetti'); if (!canvas) return; canvas.hidden = false; canvas.width = innerWidth * devicePixelRatio; canvas.height = innerHeight * devicePixelRatio; const ctx = canvas.getContext('2d'); ctx.scale(devicePixelRatio, devicePixelRatio); const colors = ['#007aff','#34c759','#ff9500','#ff3b30','#7c5cff','#ffd60a']; const pieces = Array.from({ length: 110 }, (_, i) => ({ x: Math.random()*innerWidth, y: -20-Math.random()*innerHeight*.3, size: 5+Math.random()*7, color:colors[i%colors.length], speed: 2+Math.random()*4, drift: -1+Math.random()*2, angle:Math.random()*6 })); const started = performance.now(); const draw = (time) => { ctx.clearRect(0,0,innerWidth,innerHeight); for (const p of pieces) { p.y += p.speed; p.x += p.drift; p.angle += .08; ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.angle); ctx.fillStyle=p.color; ctx.fillRect(-p.size/2,-p.size/2,p.size,p.size*1.6); ctx.restore(); } if (time-started < 3000) requestAnimationFrame(draw); else { ctx.clearRect(0,0,innerWidth,innerHeight); canvas.hidden = true; } }; requestAnimationFrame(draw); } };
