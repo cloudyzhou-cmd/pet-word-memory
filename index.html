@@ -856,6 +856,10 @@
       } catch (_) { return ''; }
     }
 
+    /** 在线词典没有提供例句时，生成一个明确标注为辅助用法的英文例句。 */
+    function fallbackExampleEn(term, definition = '') { const cleanDefinition = String(definition || '').replace(/[.。]+$/, '').trim(); return cleanDefinition ? `The word "${term}" means ${cleanDefinition}.` : `I learned how to use "${term}" in an English sentence today.`; }
+    function fallbackExampleCn(item) { return item.meaning ? `这个例句帮助理解“${item.meaning}”的用法。` : `今天我学习了“${item.word}”这个英语表达。`; }
+
     /** 从词典读取英文语境资料；中文释义优先翻译词典定义，减少孤立机器翻译造成的歧义。 */
     async function lookupWordOnline(item) {
       const term = String(item.word || '').trim();
@@ -882,9 +886,10 @@
       const definition = definitions.find(item => item.definition)?.definition || '';
       const example = definitions.find(item => item.example)?.example || '';
       if (!item.phonetic && phonetic) item.phonetic = phonetic;
-      if (!item.exampleEn && example) item.exampleEn = example;
+      if (!item.exampleEn) item.exampleEn = example || fallbackExampleEn(term, definition);
       if (!item.meaning) item.meaning = definition ? await translateOnline(definition) : await translateOnline(term);
       if (!item.exampleCn && item.exampleEn) item.exampleCn = await translateOnline(item.exampleEn);
+      if (!item.exampleCn) item.exampleCn = fallbackExampleCn(item);
       item.emoji = item.emoji || getEmoji(item.meaning);
       item.referenceUrl = `${CAMBRIDGE_REFERENCE}${encodeURIComponent(term.toLowerCase().replace(/\s+/g, '-'))}`;
       return item;
@@ -1212,6 +1217,17 @@
     /** 保存图片来源信息，便于以后检查在线图片出处。 */
     async function saveWordForm(form) { const data = Object.fromEntries(new FormData(form).entries()); const existing = data.id ? State.words.find(word => word.id === Number(data.id)) : null; const imageUrl = State.wordImageDraft !== null ? State.wordImageDraft : String(data.imageUrl || '').trim(); const imageSource = State.wordImageSource !== null ? State.wordImageSource : String(existing?.imageSource || '').trim(); const imageTitle = State.wordImageTitle || String(existing?.imageTitle || '').trim(); const next = { ...(existing || { status:'new', reviewCount:0, lastReview:0, nextReview:0, errorCount:0, createdAt:Date.now() }), word:String(data.word || '').trim(), phonetic:String(data.phonetic || '').trim(), meaning:String(data.meaning || '').trim(), exampleEn:String(data.exampleEn || '').trim(), exampleCn:String(data.exampleCn || '').trim(), imageUrl, imageSource, imageTitle, emoji:String(data.emoji || '').trim() || getEmoji(data.meaning), hint:String(data.hint || '').trim() }; if (!next.word || !next.meaning) { showToast('请填写英文单词和中文释义'); return; } const duplicate = State.words.find(word => word.word.toLowerCase() === next.word.toLowerCase() && word.id !== next.id); if (duplicate) { showToast('词库里已经有这个单词啦'); return; } await DB.put('words', next); State.words = await DB.all('words'); State.editingWordId = null; State.wordImageDraft = null; State.wordImageSource = null; State.wordImageTitle = ''; State.imageStatus = ''; await ensureDailyLog(); showToast(existing ? '单词已更新' : '单词已加入词库'); render(); }
 
+    /** 保存前保证每个词条都有英文例句、中文翻译和 Emoji。 */
+    function ensureBilingualExample(item) { item.exampleEn = String(item.exampleEn || '').trim() || fallbackExampleEn(item.word); item.exampleCn = String(item.exampleCn || '').trim() || fallbackExampleCn(item); item.emoji = String(item.emoji || '').trim() || getEmoji(item.meaning); return item; }
+    async function saveWordForm(form) { const data = Object.fromEntries(new FormData(form).entries()); const existing = data.id ? State.words.find(word => word.id === Number(data.id)) : null; const imageUrl = State.wordImageDraft !== null ? State.wordImageDraft : String(data.imageUrl || '').trim(); const imageSource = State.wordImageSource !== null ? State.wordImageSource : String(existing?.imageSource || '').trim(); const imageTitle = State.wordImageTitle || String(existing?.imageTitle || '').trim(); const next = { ...(existing || { status:'new', reviewCount:0, lastReview:0, nextReview:0, errorCount:0, createdAt:Date.now() }), word:String(data.word || '').trim(), phonetic:String(data.phonetic || '').trim(), meaning:String(data.meaning || '').trim(), exampleEn:String(data.exampleEn || '').trim(), exampleCn:String(data.exampleCn || '').trim(), imageUrl, imageSource, imageTitle, emoji:String(data.emoji || '').trim() || getEmoji(data.meaning), hint:String(data.hint || '').trim() }; if (!next.word || !next.meaning) { showToast('请填写英文单词和中文释义'); return; } const duplicate = State.words.find(word => word.word.toLowerCase() === next.word.toLowerCase() && word.id !== next.id); if (duplicate) { showToast('词库里已经有这个单词啦'); return; } if (!next.exampleEn || !next.exampleCn || !next.phonetic) { showToast('正在补全音标和中英文例句…'); await lookupWordOnline(next); } ensureBilingualExample(next); await DB.put('words', next); State.words = await DB.all('words'); State.editingWordId = null; State.wordImageDraft = null; State.wordImageSource = null; State.wordImageTitle = ''; State.imageStatus = ''; await ensureDailyLog(); showToast(existing ? '单词已更新' : '单词已加入词库'); render(); }
+    async function saveBatchInput() { if (!State.batchPreview.length) { showToast('请先解析单词'); return; } if (State.batchPreview.some(item => !item.meaning.trim())) await lookupBatchOnline(); const incomplete = State.batchPreview.filter(item => !item.meaning.trim()); if (incomplete.length) { showToast(`${incomplete.length} 个词暂时没有中文释义，请联网补全或手动填写`); return; } State.batchText = ''; await saveBatch(); }
+    async function saveBatch() { const existingWords = new Set(State.words.map(word => word.word.toLowerCase())); const items = State.batchPreview; if (items.some(item => !item.exampleEn || !item.exampleCn || !item.phonetic)) { showToast('正在准备中英文例句…'); await mapOnlineWithConcurrency(items, async item => { await lookupWordOnline(item); ensureBilingualExample(item); }, 6); } let added = 0; for (const item of items) { ensureBilingualExample(item); if (existingWords.has(item.word.toLowerCase())) continue; await DB.put('words', { ...item, status:'new', reviewCount:0, lastReview:0, nextReview:0, errorCount:0, createdAt:Date.now() + added }); added++; } State.words = await DB.all('words'); State.batchPreview = []; await ensureDailyLog(); showToast(added ? `已录入 ${added} 个单词` : '重复单词已跳过'); render(); }
+
+    /** 允许只输入英文单词：保存时先自动查询中文释义，再补全中英文例句和 Emoji。 */
+    async function saveWordForm(form) { const data = Object.fromEntries(new FormData(form).entries()); const existing = data.id ? State.words.find(word => word.id === Number(data.id)) : null; const imageUrl = State.wordImageDraft !== null ? State.wordImageDraft : String(data.imageUrl || '').trim(); const imageSource = State.wordImageSource !== null ? State.wordImageSource : String(existing?.imageSource || '').trim(); const imageTitle = State.wordImageTitle || String(existing?.imageTitle || '').trim(); const next = { ...(existing || { status:'new', reviewCount:0, lastReview:0, nextReview:0, errorCount:0, createdAt:Date.now() }), word:String(data.word || '').trim(), phonetic:String(data.phonetic || '').trim(), meaning:String(data.meaning || '').trim(), exampleEn:String(data.exampleEn || '').trim(), exampleCn:String(data.exampleCn || '').trim(), imageUrl, imageSource, imageTitle, emoji:String(data.emoji || '').trim() || getEmoji(data.meaning), hint:String(data.hint || '').trim() }; if (!next.word) { showToast('请先填写英文单词或词组'); return; } const duplicate = State.words.find(word => word.word.toLowerCase() === next.word.toLowerCase() && word.id !== next.id); if (duplicate) { showToast('词库里已经有这个单词啦'); return; } if (!next.meaning || !next.exampleEn || !next.exampleCn || !next.phonetic) { showToast('正在自动补全释义、音标和中英文例句…'); await lookupWordOnline(next); } if (!next.meaning) { showToast('暂时没有查到中文释义，请检查单词拼写'); return; } ensureBilingualExample(next); await DB.put('words', next); State.words = await DB.all('words'); State.editingWordId = null; State.wordImageDraft = null; State.wordImageSource = null; State.wordImageTitle = ''; State.imageStatus = ''; await ensureDailyLog(); showToast(existing ? '单词已更新' : '单词已加入词库'); render(); }
+    /** 拦截表单原生 required 校验，让“只输入英文单词”也能触发在线补全。 */
+    document.addEventListener('click', (event) => { const submit = event.target.closest('#wordForm button[type="submit"]'); if (!submit) return; event.preventDefault(); const form = submit.closest('form'); form?.querySelector('[name="meaning"]')?.removeAttribute('required'); if (form) saveWordForm(form); }, true);
+
     /** 仪表盘空任务态：没有词条时显示“去录入”，不能把 0 个任务误报为已完成。 */
     function renderDashboard() {
       const log = currentLog() || { wordsStudied: [], wordsReviewed: [], plannedNew: [], plannedReview: [] };
@@ -1230,6 +1246,95 @@
       return `<section class="screen"><header class="topbar"><div class="brand-lockup"><div class="brand-mark">📗</div><div><div class="brand-title">希希词语家</div><div class="brand-subtitle">PET Vocabulary · 今日 ${escapeHtml(State.today.slice(5).replace('-', '月'))} 日</div></div></div></header><div class="stack"><section class="card hero-card"><div class="eyebrow">本周学习进度</div><div class="hero-number">${week.completed}<span> / 30 个词</span></div><div>每天一点点，词汇会长大 🌱</div><div class="progress-track"><div class="progress-fill" style="width:${percent}%"></div></div><div class="progress-meta"><span>${week.completed ? `已经坚持 ${week.days} 天` : '今天也来学一点'}</span><span>${percent}%</span></div></section><section class="card coin-hero"><div class="eyebrow">个人打卡榜 · 我的希币</div><div class="coin-number">${growth.coins}<span> 希币</span></div><div>积分 ${growth.coins} 分 · 今天 +${growth.todayCoins} 希币</div><button class="btn" style="margin-top:15px;color:#9a5600;background:#fff" data-action="open-admin-tab" data-tab="overview">查看成长榜 →</button></section><section class="stack"><div class="section-heading"><h2>今天学什么</h2><span class="badge ${dailyDone ? 'green' : total ? 'blue' : 'orange'}">${dailyDone ? '全部完成' : total ? `${newDone + reviewDone} / ${total}` : '先添加单词'}</span></div><article class="card task-card new-task"><div class="row between"><div class="task-icon">📘</div>${newStatus}</div><div><div class="task-title">今日新学 · ${newWords.length} 个</div><div class="task-caption">${newWords.length ? '认识新朋友，完成拼写就能获得希币。' : State.words.length ? '今天没有安排新的学习词条，可以先添加新词。' : '词库里还没有单词，添加后就可以开始学习。'}</div></div>${newWords.length ? `<div class="word-preview">${newWords.map(word => escapeHtml(word.word)).join(' · ')}</div>` : ''}${newButton}</article><article class="card task-card review-task ${!newComplete ? 'locked' : ''}"><div class="row between"><div class="task-icon">📙</div>${reviewStatus}</div><div><div class="task-title">今日复习 · ${reviewWords.length} 个</div><div class="task-caption">${!newComplete ? '完成今日新词后，就能开始复习啦。' : reviewWords.length ? '把学过的单词再叫醒一次。' : '今天没有到期复习词，轻松完成！'}</div></div>${reviewButton}</article></section>${renderWeeklyTestCard(getWeeklyTestWords())}<section class="card card-pad"><div class="row between"><div><h3>${dailyDone ? '今日完成！明天见 🌟' : total ? '准备好了吗？' : '先准备学习内容吧'}</h3><p class="muted small" style="margin-top:6px">${dailyDone ? '你的学习和希币都已经被记录下来。' : total ? '每个新词完成拼写后，会获得1枚希币。' : '录入单词并配上图片后，就可以开始三步学习。'}</p></div><div style="font-size:35px">${dailyDone ? '🎉' : total ? '🧠' : '🖼️'}</div></div>${!dailyDone && total === 0 ? '<button class="btn btn-primary btn-block" style="margin-top:15px" data-action="open-admin-tab" data-tab="add">去录入词库 →</button>' : ''}</section></div>${navBar()}</section>`;
     }
 
+    /**
+     * 标准示例库：词典没有提供短语例句时，使用经过人工整理的常用表达。
+     * 这些内容只作为在线词典无结果时的兜底，不会覆盖用户自己填写的例句。
+     */
+    const STANDARD_PHRASE_EXAMPLES = {
+      'a variety of': { en: 'The library has a variety of books for children.', cn: '这家图书馆有各种各样的儿童读物。' },
+      'public transport': { en: 'Many people use public transport to travel around the city.', cn: '许多人乘坐公共交通在城市里出行。' },
+      'publick transport': { en: 'Many people use public transport to travel around the city.', cn: '许多人乘坐公共交通在城市里出行。' }
+    };
+    function standardPhraseExample(term) { return STANDARD_PHRASE_EXAMPLES[String(term || '').toLowerCase().replace(/\s+/g, ' ').trim()] || null; }
+    function fallbackExampleEn(term, definition = '') {
+      const phrase = standardPhraseExample(term);
+      if (phrase) return phrase.en;
+      const cleanDefinition = String(definition || '').replace(/[.。]+$/, '').trim();
+      return cleanDefinition ? `The word "${term}" means ${cleanDefinition}.` : `I learned how to use "${term}" in an English sentence today.`;
+    }
+    function fallbackExampleCn(item) {
+      const phrase = standardPhraseExample(item?.word);
+      if (phrase) return phrase.cn;
+      return item?.meaning ? `这个例句帮助理解“${item.meaning}”的用法。` : `今天我学习了“${item?.word || ''}”这个英语表达。`;
+    }
+    /** 保存前统一补齐截图标准中的：音标、中文释义、英文例句、中文翻译和 Emoji。 */
+    function ensureBilingualExample(item) {
+      item.exampleEn = String(item.exampleEn || '').trim() || fallbackExampleEn(item.word);
+      item.exampleCn = String(item.exampleCn || '').trim() || fallbackExampleCn(item);
+      item.emoji = String(item.emoji || '').trim() || getEmoji(item.meaning);
+      return item;
+    }
+    /** 新词只需输入英文；保存时按截图标准自动查资料并写入完整词条。 */
+    async function saveWordForm(form) {
+      const data = Object.fromEntries(new FormData(form).entries());
+      const existing = data.id ? State.words.find(word => word.id === Number(data.id)) : null;
+      const suppliedEmoji = String(data.emoji || '').trim();
+      const imageUrl = State.wordImageDraft !== null ? State.wordImageDraft : String(data.imageUrl || '').trim();
+      const imageSource = State.wordImageSource !== null ? State.wordImageSource : String(existing?.imageSource || '').trim();
+      const imageTitle = State.wordImageTitle || String(existing?.imageTitle || '').trim();
+      const next = {
+        ...(existing || { status:'new', reviewCount:0, lastReview:0, nextReview:0, errorCount:0, createdAt:Date.now() }),
+        word: String(data.word || '').trim(),
+        phonetic: String(data.phonetic || '').trim(),
+        meaning: String(data.meaning || '').trim(),
+        exampleEn: String(data.exampleEn || '').trim(),
+        exampleCn: String(data.exampleCn || '').trim(),
+        imageUrl, imageSource, imageTitle,
+        // 先保持空值，等在线释义返回后再根据最终中文释义匹配 Emoji。
+        emoji: suppliedEmoji,
+        hint: String(data.hint || '').trim()
+      };
+      if (!next.word) { showToast('请先填写英文单词或词组'); return; }
+      const duplicate = State.words.find(word => word.word.toLowerCase() === next.word.toLowerCase() && word.id !== next.id);
+      if (duplicate) { showToast('词库里已经有这个单词啦'); return; }
+      if (!next.meaning || !next.exampleEn || !next.exampleCn || !next.phonetic) {
+        showToast('正在自动补全释义、音标和中英文例句…');
+        await lookupWordOnline(next);
+      }
+      if (!next.meaning) { showToast('暂时没有查到中文释义，请检查单词拼写'); return; }
+      ensureBilingualExample(next);
+      if (!suppliedEmoji) next.emoji = getEmoji(next.meaning);
+      await DB.put('words', next);
+      State.words = await DB.all('words');
+      State.editingWordId = null; State.wordImageDraft = null; State.wordImageSource = null; State.wordImageTitle = ''; State.imageStatus = '';
+      await ensureDailyLog();
+      showToast(existing ? '单词已更新' : '单词已加入词库');
+      render();
+    }
+    /** 批量录入同样走统一标准，防止只识别出英文却保存出不完整词条。 */
+    async function saveBatch() {
+      const existingWords = new Set(State.words.map(word => word.word.toLowerCase()));
+      const items = State.batchPreview;
+      if (items.some(item => !item.meaning || !item.phonetic || !item.exampleEn || !item.exampleCn)) {
+        showToast('正在准备每个词的释义、音标和中英文例句…');
+        await mapOnlineWithConcurrency(items, async item => { await lookupWordOnline(item); ensureBilingualExample(item); }, 6);
+      }
+      const incomplete = items.filter(item => !String(item.meaning || '').trim());
+      if (incomplete.length) {
+        showToast(`${incomplete.length} 个词没有查到中文释义，暂不录入，请检查拼写或手动补充。`);
+        render();
+        return;
+      }
+      let added = 0;
+      for (const item of items) {
+        ensureBilingualExample(item);
+        if (existingWords.has(item.word.toLowerCase())) continue;
+        await DB.put('words', { ...item, status:'new', reviewCount:0, lastReview:0, nextReview:0, errorCount:0, createdAt:Date.now() + added });
+        added++;
+      }
+      State.words = await DB.all('words'); State.batchPreview = []; await ensureDailyLog();
+      showToast(added ? `已录入 ${added} 个单词` : '没有新增词条，请检查释义或重复项'); render();
+    }
     init();
   </script>
 </body>
