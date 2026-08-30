@@ -1943,12 +1943,31 @@
         return;
       }
       const bookId = Number(State.batchNotebookId || State.activeNotebookId);
-      const existingWords = new Set(State.words.map(word => normalizeLookupTerm(word.word)));
+      const existingByWord = new Map(State.words.map(word => [normalizeLookupTerm(word.word), word]));
       let added = 0;
+      let updated = 0;
       for (const item of ready) {
         ensureBilingualExample(item);
         if (!item.emoji || item.emoji === EMOJI_MAP.default) item.emoji = getEmoji(item.meaning, item.word);
-        if (existingWords.has(normalizeLookupTerm(item.word))) continue;
+        const existing = existingByWord.get(normalizeLookupTerm(item.word));
+        if (existing) {
+          // 旧版本可能已经保存了同名单词，但资料是残缺的。再次录入时补齐资料，
+          // 同时保留孩子的学习状态、希币记录、错误次数和所属单词本。
+          await DB.put('words', {
+            ...existing,
+            phonetic: item.phonetic || existing.phonetic || '',
+            meaning: item.meaning || existing.meaning || '',
+            exampleEn: item.exampleEn || existing.exampleEn || '',
+            exampleCn: item.exampleCn || existing.exampleCn || '',
+            emoji: item.emoji || existing.emoji || getEmoji(item.meaning, item.word),
+            hint: item.hint || existing.hint || '',
+            imageUrl: item.imageUrl || existing.imageUrl || '',
+            imageSource: item.imageSource || existing.imageSource || '',
+            imageTitle: item.imageTitle || existing.imageTitle || ''
+          });
+          updated++;
+          continue;
+        }
         await DB.put('words', { ...item, notebookId: bookId, status: 'new', reviewCount: 0, lastReview: 0, nextReview: 0, errorCount: 0, createdAt: Date.now() + added });
         added++;
       }
@@ -1958,7 +1977,12 @@
       State.batchEditIndex = null;
       await ensureDailyLog();
       render();
-      showToast(incomplete.length ? `已录入 ${added} 个；还有 ${incomplete.length} 个待补充` : `已录入 ${added} 个单词到“${notebookName(bookId)}”`);
+      const savedText = added && updated
+        ? `新增 ${added} 个，并补齐 ${updated} 个已有词`
+        : added
+          ? `已录入 ${added} 个单词到“${notebookName(bookId)}”`
+          : `已补齐 ${updated} 个已有词`;
+      showToast(incomplete.length ? `${savedText}；还有 ${incomplete.length} 个待补充` : savedText);
     }
 
     /** 批量预览词条的单条补充入口。 */
