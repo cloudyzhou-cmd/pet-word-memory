@@ -408,7 +408,7 @@
       route: '/learn', currentUser: 'child', today: todayKey(), settings: { ...DEFAULT_SETTINGS }, words: [], logs: [], notebooks: [], activeNotebookId: null, legacyWordsPresent: false,
       currentTask: null, guidePage: 0, showGuide: false, stageAReadyAt: 0, stageAFlipped: false, stageB: null, spell: null, weeklyTest: null,
       adminTab: 'overview', adminLoggedIn: false, adminSearch: '', adminPage: 1, editingWordId: null, batchPreview: [], importPayload: null,
-      wordSearch: '', batchText: '', batchLookupRunning: false, ocrStatus: '', selectedWordId: null, toastTimer: null, wordImageDraft: null, wordImageSource: null, wordImageTitle: '', imageStatus: '', notebookSearch: '', notebookEditingId: null
+      wordSearch: '', batchText: '', batchLookupRunning: false, batchEditIndex: null, ocrStatus: '', selectedWordId: null, toastTimer: null, wordImageDraft: null, wordImageSource: null, wordImageTitle: '', imageStatus: '', notebookSearch: '', notebookEditingId: null
     };
 
     /** 读取本地数据，并在首次启动时写入示例词。 */
@@ -1756,6 +1756,252 @@
       const reviewButton = reviewHasTask ? '<button class="btn ' + (!newComplete || reviewComplete ? 'btn-secondary' : 'btn-warning') + ' btn-block" data-action="start-task" data-type="review" ' + (!newComplete || reviewComplete ? 'disabled' : '') + '>' + (reviewComplete ? '复习已完成' : !newComplete ? '完成新词后解锁' : '开始复习 →') + '</button>' : '<button class="btn btn-secondary btn-block" disabled>今天没有到期复习词</button>';
       return '<section class="screen"><header class="topbar"><div class="brand-lockup"><div class="brand-mark">' + escapeHtml(book?.icon || '📚') + '</div><div><div class="brand-title">希希词语家</div><div class="brand-subtitle">当前学习：' + escapeHtml(book?.name || '单词本') + '</div></div></div></header><div class="stack">' + notebookSelector() + '<section class="card hero-card"><div class="eyebrow">本周学习进度</div><div class="hero-number">' + week.completed + '<span> / 30 个词</span></div><div>每天一点点，词汇会长大 🌱</div><div class="progress-track"><div class="progress-fill" style="width:' + percent + '%"></div></div><div class="progress-meta"><span>' + (week.completed ? '已经坚持 ' + week.days + ' 天' : '今天也来学一点') + '</span><span>' + percent + '%</span></div></section><section class="card coin-hero"><div class="eyebrow">个人打卡榜 · 我的希币</div><div class="coin-number">' + growth.coins + '<span> 希币</span></div><div>积分 ' + growth.coins + ' 分 · 今天 +' + growth.todayCoins + ' 希币</div><button class="btn" style="margin-top:15px;color:#9a5600;background:#fff" data-action="open-admin-tab" data-tab="overview">查看成长榜 →</button></section><section class="stack"><div class="section-heading"><h2>今天学什么</h2><span class="badge ' + (dailyDone ? 'green' : total ? 'blue' : 'orange') + '">' + (dailyDone ? '全部完成' : total ? (newDone + reviewDone) + ' / ' + total : '先添加单词') + '</span></div><article class="card task-card new-task"><div class="row between"><div class="task-icon">📘</div>' + newStatus + '</div><div><div class="task-title">今日新学 · ' + newWords.length + ' 个</div><div class="task-caption">' + (newHasTask ? '认识新朋友，完成拼写就能获得希币。' : State.words.length ? '这个单词本今天没有安排新的学习词条。' : '词库里还没有单词，添加后就可以开始学习。') + '</div></div>' + (newHasTask ? '<div class="word-preview">' + newWords.map(word => escapeHtml(word.word)).join(' · ') + '</div>' : '') + newButton + '</article><article class="card task-card review-task ' + (!newComplete && reviewHasTask ? 'locked' : '') + '"><div class="row between"><div class="task-icon">📙</div>' + reviewStatus + '</div><div><div class="task-title">今日复习 · ' + reviewWords.length + ' 个</div><div class="task-caption">' + (!newComplete ? '完成今日新词后，就能开始复习啦。' : reviewHasTask ? '把学过的单词再叫醒一次。' : '今天没有到期复习词，轻松完成！') + '</div></div>' + reviewButton + '</article></section>' + renderWeeklyTestCard(getWeeklyTestWords()) + '<section class="card card-pad"><div class="row between"><div><h3>' + (dailyDone ? '今日完成！明天见 🌟' : total ? '准备好了吗？' : '先准备学习内容吧') + '</h3><p class="muted small" style="margin-top:6px">' + (dailyDone ? '你的学习和希币都已经被记录下来。' : total ? '每个新词完成拼写后，会获得1枚希币。' : '先在工具中录入单词，再开始学习。') + '</p></div><div style="font-size:35px">' + (dailyDone ? '🎉' : total ? '🧠' : '📚') + '</div></div></section></div>' + navBar() + '</section>';
     }
+    /* ==================== 批量补全稳定性修复 ====================
+       旧版页面经过多轮升级，曾经留下多个同名函数，导致部分设备仍执行旧的
+       “四项资料必须同时存在”的逻辑。本段是最终统一入口：只允许真实资料，
+       但一条资料不完整时不会再卡死整批，而是明确告诉用户缺什么。 */
+    Object.assign(CURATED_PET_WORDS, {
+      snowstorm: { phonetic: '/ˈsnəʊstɔːm/', meaning: '暴风雪；雪暴', en: 'The snowstorm closed the roads in the north.', cn: '暴风雪封闭了北部的道路。', emoji: '🌨️' },
+      chilly: { phonetic: '/ˈtʃɪli/', meaning: '寒冷的；凉飕飕的', en: 'It was a chilly morning, so I wore a jacket.', cn: '早晨很冷，所以我穿上了一件夹克。', emoji: '🥶' },
+      cloudy: { phonetic: '/ˈklaʊdi/', meaning: '多云的；阴天的', en: 'It was cloudy all morning, but the sun came out later.', cn: '整个早上都是阴天，但后来太阳出来了。', emoji: '☁️' },
+      sunny: { phonetic: '/ˈsʌni/', meaning: '晴朗的；阳光充足的', en: 'It will be sunny and warm this weekend.', cn: '这个周末天气晴朗而温暖。', emoji: '☀️' },
+      rainy: { phonetic: '/ˈreɪni/', meaning: '下雨的；多雨的', en: 'We stayed at home on the rainy afternoon.', cn: '那个下雨的下午，我们待在家里。', emoji: '🌧️' },
+      windy: { phonetic: '/ˈwɪndi/', meaning: '有风的；风大的', en: 'It was too windy to play tennis outside.', cn: '风太大了，不能在外面打网球。', emoji: '💨' },
+      snowy: { phonetic: '/ˈsnəʊi/', meaning: '下雪的；被雪覆盖的', en: 'The snowy streets looked beautiful at night.', cn: '夜晚被雪覆盖的街道看起来很美。', emoji: '❄️' },
+      storm: { phonetic: '/stɔːm/', meaning: '暴风雨；风暴', en: 'The storm damaged several houses near the coast.', cn: '暴风雨损坏了海岸附近的几所房屋。', emoji: '🌪️' },
+      warm: { phonetic: '/wɔːm/', meaning: '温暖的；暖和的', en: 'The water is warm enough for swimming.', cn: '水温暖和，适合游泳。', emoji: '🌞' },
+      cool: { phonetic: '/kuːl/', meaning: '凉爽的；凉的', en: 'The evening air was cool and fresh.', cn: '晚上的空气凉爽而清新。', emoji: '🍃' },
+      cold: { phonetic: '/kəʊld/', meaning: '寒冷的；冷的', en: 'It was so cold that the lake froze.', cn: '天气太冷了，湖水都结冰了。', emoji: '🥶' },
+      misty: { phonetic: '/ˈmɪsti/', meaning: '有薄雾的；朦胧的', en: 'The hills looked beautiful on the misty morning.', cn: '在有薄雾的早晨，群山看起来很美。', emoji: '🌫️' },
+      drizzle: { phonetic: '/ˈdrɪzl/', meaning: '毛毛雨；下毛毛雨', en: 'A light drizzle began as we walked home.', cn: '我们走回家时，开始下起了小雨。', emoji: '🌦️' },
+      rainbow: { phonetic: '/ˈreɪnbəʊ/', meaning: '彩虹', en: 'A bright rainbow appeared after the shower.', cn: '阵雨过后出现了一道鲜艳的彩虹。', emoji: '🌈' },
+      breeze: { phonetic: '/briːz/', meaning: '微风；和风', en: 'A gentle breeze came through the open window.', cn: '一阵微风从开着的窗户吹了进来。', emoji: '🍃' },
+      forecast: { phonetic: '/ˈfɔːkɑːst/', meaning: '天气预报；预报', en: 'The forecast says that temperatures will rise tomorrow.', cn: '预报说明天气温明天会升高。', emoji: '🌤️' },
+      humid: { phonetic: '/ˈhjuːmɪd/', meaning: '潮湿的；湿热的', en: 'It was hot and humid in the city today.', cn: '今天城里又热又潮湿。', emoji: '💧' },
+      temperature: { phonetic: '/ˈtemprətʃə(r)/', meaning: '温度；气温', en: 'The temperature dropped below zero last night.', cn: '昨晚气温降到了零度以下。', emoji: '🌡️' }
+    });
+
+    const hasChineseText = (value) => /[\u3400-\u9fff]/.test(String(value || ''));
+    const isUsableMeaning = (value) => {
+      const text = String(value || '').trim();
+      if (!hasChineseText(text) || /[.!?]/.test(text)) return false;
+      return !/^\s*(?:the|a|an|we|there|this|it|n\.)\b/i.test(text);
+    };
+    const isUsableEnglishExample = (value) => {
+      const text = String(value || '').trim();
+      return /[A-Za-z]{2,}/.test(text) && !/^(?:The word|I learned how to use)\b/i.test(text);
+    };
+    const isUsableChineseExample = (value) => hasChineseText(value) && !/^[A-Za-z\s.,!?'-]+$/.test(String(value || '').trim());
+    function missingBatchFields(item) {
+      const missing = [];
+      if (!isUsableMeaning(item.meaning)) missing.push('中文释义');
+      if (!String(item.phonetic || '').trim()) missing.push('音标');
+      if (!isUsableEnglishExample(item.exampleEn)) missing.push('英文例句');
+      if (!isUsableChineseExample(item.exampleCn)) missing.push('中文翻译');
+      return missing;
+    }
+
+    /** 翻译服务有时返回英文或错误字符串；只有确实包含中文才写回词条。 */
+    async function translateOnline(text) {
+      const value = String(text || '').trim();
+      if (!value || navigator.onLine === false) return '';
+      const cacheKey = `en-zh:${value.toLowerCase()}`;
+      if (ONLINE_CACHE.translations?.[cacheKey] && hasChineseText(ONLINE_CACHE.translations[cacheKey])) return ONLINE_CACHE.translations[cacheKey];
+      const save = (translated) => {
+        const clean = String(translated || '').replace(/&quot;/g, '"').trim();
+        if (!hasChineseText(clean) || clean.length > 260) return '';
+        ONLINE_CACHE.translations = ONLINE_CACHE.translations || {};
+        ONLINE_CACHE.translations[cacheKey] = clean;
+        writeOnlineCache(ONLINE_CACHE);
+        return clean;
+      };
+      try {
+        const response = await fetchWithTimeout(`${TRANSLATION_API}?q=${encodeURIComponent(value)}&langpair=en|zh-CN`, {}, 1800);
+        if (response.ok) {
+          const payload = await response.json();
+          const translated = save(payload?.responseData?.translatedText);
+          if (translated) return translated;
+        }
+      } catch (_) {}
+      try {
+        const response = await fetchWithTimeout(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=zh-CN&dt=t&q=${encodeURIComponent(value)}`, {}, 1800);
+        if (response.ok) {
+          const payload = await response.json();
+          const translated = save(Array.isArray(payload?.[0]) ? payload[0].map(part => part?.[0] || '').join('') : '');
+          if (translated) return translated;
+        }
+      } catch (_) {}
+      return '';
+    }
+
+    /** 最终版在线补全：先用已核对词条，再访问词典，拒绝把英文定义当中文释义。 */
+    async function lookupWordOnline(item) {
+      const term = normalizeLookupTerm(item.word);
+      if (!term) return item;
+      const curated = referenceDataFor(term);
+      if (curated) {
+        if (!isUsableMeaning(item.meaning)) item.meaning = curated.meaning || item.meaning;
+        if (!item.phonetic) item.phonetic = curated.phonetic || '';
+        if (!isUsableEnglishExample(item.exampleEn)) item.exampleEn = curated.en || item.exampleEn;
+        if (!isUsableChineseExample(item.exampleCn)) item.exampleCn = curated.cn || item.exampleCn;
+        item.emoji = String(item.emoji || '').trim() || curated.emoji || getEmoji(item.meaning, term);
+        item.referenceUrl = `${CAMBRIDGE_REFERENCE}${encodeURIComponent(term.replace(/\s+/g, '-'))}`;
+        return item;
+      }
+      let entry = null;
+      const isSingleWord = /^[A-Za-z]+(?:['-][A-Za-z]+)?$/.test(term);
+      if (isSingleWord && navigator.onLine !== false) {
+        try {
+          const cacheKey = term.toLowerCase();
+          if (ONLINE_CACHE.dictionary?.[cacheKey]) entry = ONLINE_CACHE.dictionary[cacheKey];
+          else {
+            const response = await fetchWithTimeout(`${DICTIONARY_API}${encodeURIComponent(term)}`, {}, 2800);
+            if (response.ok) {
+              const payload = await response.json();
+              entry = Array.isArray(payload) ? payload[0] : null;
+              if (entry) { ONLINE_CACHE.dictionary = ONLINE_CACHE.dictionary || {}; ONLINE_CACHE.dictionary[cacheKey] = entry; writeOnlineCache(ONLINE_CACHE); }
+            }
+          }
+        } catch (_) {}
+      }
+      const phonetic = entry?.phonetic || entry?.phonetics?.find(value => value.text)?.text || '';
+      const definitions = entry?.meanings?.flatMap(value => value.definitions || []) || [];
+      const definition = definitions.find(value => value.definition)?.definition || '';
+      const example = definitions.find(value => isUsableEnglishExample(value.example))?.example || '';
+      if (!item.phonetic && phonetic) item.phonetic = phonetic;
+      if (!isUsableEnglishExample(item.exampleEn) && example) item.exampleEn = example;
+      if (!isUsableMeaning(item.meaning)) {
+        const translated = await translateOnline(definition || term);
+        if (translated) item.meaning = translated;
+      }
+      if (!isUsableChineseExample(item.exampleCn) && isUsableEnglishExample(item.exampleEn)) {
+        const translated = await translateOnline(item.exampleEn);
+        if (translated) item.exampleCn = translated;
+      }
+      item.emoji = String(item.emoji || '').trim() || getEmoji(item.meaning, term);
+      item.referenceUrl = `${CAMBRIDGE_REFERENCE}${encodeURIComponent(term.replace(/\s+/g, '-'))}`;
+      return item;
+    }
+
+    /** 启动时修复旧版留下的默认图标、英文伪释义和模板句，但不覆盖家长已有的真实内容。 */
+    async function cleanStoredWordData(words) {
+      const fakeEn = [/^The word ".+" means .+\.$/i, /^I learned how to use ".+" in an English sentence today\.$/i];
+      const fakeCn = [/^这个例句帮助理解“.*”的用法。$/, /^今天我学习了“.*”这个英语表达。$/];
+      const cleaned = [];
+      for (const word of words || []) {
+        const next = { ...word };
+        const curated = referenceDataFor(next.word);
+        let changed = false;
+        if (fakeEn.some(pattern => pattern.test(String(next.exampleEn || '').trim()))) { next.exampleEn = ''; changed = true; }
+        if (fakeCn.some(pattern => pattern.test(String(next.exampleCn || '').trim()))) { next.exampleCn = ''; changed = true; }
+        if (curated) {
+          if (!isUsableMeaning(next.meaning)) { next.meaning = curated.meaning || next.meaning; changed = true; }
+          if (!next.phonetic && curated.phonetic) { next.phonetic = curated.phonetic; changed = true; }
+          if (!isUsableEnglishExample(next.exampleEn) && curated.en) { next.exampleEn = curated.en; changed = true; }
+          if (!isUsableChineseExample(next.exampleCn) && curated.cn) { next.exampleCn = curated.cn; changed = true; }
+          if ((!next.emoji || next.emoji === EMOJI_MAP.default) && (curated.emoji || next.meaning)) { next.emoji = curated.emoji || getEmoji(next.meaning, next.word); changed = true; }
+        } else if (!next.emoji || next.emoji === EMOJI_MAP.default) {
+          const expected = getEmoji(next.meaning, next.word);
+          if (expected !== EMOJI_MAP.default && next.emoji !== expected) { next.emoji = expected; changed = true; }
+        }
+        if (changed && next.id !== undefined) await DB.put('words', next);
+        cleaned.push(next);
+      }
+      return cleaned;
+    }
+
+    /** 批量预览逐词显示状态；不完整的词可直接带入右侧逐条表单补齐。 */
+    function renderAdminAdd() {
+      const edit = State.editingWordId ? State.words.find(word => word.id === State.editingWordId) : null;
+      const batchIndex = Number.isInteger(State.batchEditIndex) ? State.batchEditIndex : null;
+      const batchDraft = batchIndex !== null ? State.batchPreview[batchIndex] : null;
+      const draft = edit || batchDraft || {};
+      const completeCount = State.batchPreview.filter(item => !missingBatchFields(item).length).length;
+      const incompleteCount = State.batchPreview.length - completeCount;
+      const preview = State.batchPreview.length ? `<div class="preview-list" style="margin-top:15px">${State.batchPreview.map((item, index) => { const missing = missingBatchFields(item); const complete = !missing.length; return `<div class="preview-item"><div class="row between"><strong>${escapeHtml(item.emoji || getEmoji(item.meaning, item.word))} ${escapeHtml(item.word)}</strong><span class="badge ${complete ? 'green' : 'orange'}">${complete ? '资料完整' : '待补充'}</span></div><div class="muted small" style="margin-top:5px">${escapeHtml(item.meaning || '中文释义待补充')}</div>${item.phonetic ? `<div class="tiny" style="margin-top:5px">音标：${escapeHtml(item.phonetic)}</div>` : ''}${item.exampleEn ? `<div class="tiny" style="margin-top:5px">英文例句：${escapeHtml(item.exampleEn)}</div>` : ''}${item.exampleCn ? `<div class="tiny" style="margin-top:5px">中文翻译：${escapeHtml(item.exampleCn)}</div>` : ''}${complete ? '<div class="tiny" style="margin-top:7px;color:var(--success)">可以直接录入</div>' : `<div class="tiny" style="margin-top:7px;color:var(--warning)">缺少：${escapeHtml(missing.join('、'))}</div><button class="mini-btn blue" style="margin-top:8px" data-action="edit-batch-item" data-index="${index}">逐条补充</button>`}</div>`; }).join('')}</div>` : '';
+      const formTitle = edit ? `编辑 ${escapeHtml(edit.word)}` : batchDraft ? `补充 ${escapeHtml(batchDraft.word)}` : '手动录入';
+      const formButton = edit ? '保存修改' : batchDraft ? '更新预览资料' : '加入词库';
+      const image = imageDraftFor(edit);
+      return `<div class="admin-layout"><div class="stack"><section class="card card-pad"><div class="eyebrow">📷 拍照识别</div><h2 style="margin-top:7px">拍下英文词表</h2><p class="muted small" style="line-height:1.65;margin-top:9px">可以拍照或从相册选择，识别出的英文单词和词组会放入下面的批量输入框。</p><label class="btn btn-primary btn-block" style="margin-top:15px">📷 拍照 / 选择图片<input type="file" accept="image/*" capture="environment" data-input="ocr-file" hidden></label><div class="tiny muted" data-ocr-status style="margin-top:11px">${escapeHtml(State.ocrStatus || '上传前会先询问你是否同意，照片不会自动上传。')}</div></section><section class="card card-pad"><div class="row between"><div><div class="eyebrow">批量录入</div><h2 style="margin-top:7px">每行一个单词或词组</h2></div><span class="badge blue">在线补全</span></div><textarea class="textarea" style="margin-top:15px" data-input="batch-text" placeholder="a variety of\npublic transport\nsnowstorm\nchilly">${escapeHtml(State.batchText)}</textarea><div class="row wrap" style="margin-top:12px"><button class="btn btn-secondary" data-action="parse-batch">解析并预览</button>${State.batchPreview.length ? `<button class="btn btn-primary" data-action="lookup-batch" ${State.batchLookupRunning ? 'disabled' : ''}>${State.batchLookupRunning ? '补全中…' : '🌐 在线补全'}</button><button class="btn btn-success" data-action="save-batch" ${State.batchLookupRunning || !completeCount ? 'disabled' : ''}>${completeCount === State.batchPreview.length ? `确认录入 ${completeCount} 个` : `录入已完成 ${completeCount} 个`}</button>` : ''}</div>${State.batchPreview.length ? `<div class="tiny muted" data-online-status style="margin-top:10px">${incompleteCount ? `已有 ${completeCount} 个资料完整；还有 ${incompleteCount} 个，请按每条提示补充。` : '全部资料完整，可以确认录入。'}</div>` : ''}${preview}</section></div><section class="card card-pad"><div class="eyebrow">${edit ? '编辑单词' : batchDraft ? '批量词条补充' : '逐条添加'}</div><h2 style="margin-top:7px">${formTitle}</h2><form id="wordForm" class="field-grid" style="margin-top:16px"><input type="hidden" name="id" value="${edit?.id || ''}"><label class="field"><span>英文单词或词组 *</span><input class="input" name="word" required value="${escapeHtml(draft.word || '')}" placeholder="例如 a variety of"></label>${notebookSelector('所属单词本', draft.notebookId || State.activeNotebookId).replace('data-input="active-notebook"', 'data-input="form-notebook"')}<div class="field-grid two"><label class="field"><span>音标</span><input class="input" name="phonetic" value="${escapeHtml(draft.phonetic || '')}" placeholder="自动补全"></label><label class="field"><span>中文释义</span><input class="input" name="meaning" value="${escapeHtml(draft.meaning || '')}" placeholder="点击在线补全"></label></div><label class="field"><span>英文例句</span><textarea class="textarea" style="min-height:90px" name="exampleEn" placeholder="在线词典有例句时会自动填入">${escapeHtml(draft.exampleEn || '')}</textarea></label><label class="field"><span>中文翻译</span><input class="input" name="exampleCn" value="${escapeHtml(draft.exampleCn || '')}" placeholder="自动翻译"></label><label class="field"><span>图片链接（可选）</span><input class="input" name="imageUrl" data-input="word-image-url" value="${escapeHtml(image)}" placeholder="粘贴图片链接 https://..."></label>${edit ? renderImagePicker(edit) : ''}<div class="field-grid two"><label class="field"><span>Emoji 兜底</span><input class="input" name="emoji" value="${escapeHtml(draft.emoji || '')}" placeholder="自动匹配"></label><label class="field"><span>记忆提示</span><textarea class="textarea" style="min-height:80px" name="hint" placeholder="词根拆解或联想故事">${escapeHtml(draft.hint || '')}</textarea></label></div><div class="row wrap"><button class="btn btn-secondary" type="button" data-action="lookup-form">🌐 在线补全</button><button class="btn btn-primary" type="submit">${formButton}</button>${(edit || batchDraft) ? '<button class="btn btn-secondary" type="button" data-action="cancel-edit">取消</button>' : ''}</div></form></section></div>`;
+    }
+
+    /** 保存批量预览时只保存资料完整的条目，其余条目留在预览中逐条处理。 */
+    async function saveBatch() {
+      const items = State.batchPreview;
+      if (!items.length || State.batchLookupRunning) return;
+      const pending = items.filter(item => missingBatchFields(item).length);
+      if (pending.length) {
+        showToast(`正在补全 ${pending.length} 个资料不完整的词…`);
+        await mapOnlineWithConcurrency(pending, async item => { await lookupWordOnline(item); }, 6);
+      }
+      const ready = items.filter(item => !missingBatchFields(item).length);
+      const incomplete = items.filter(item => missingBatchFields(item).length);
+      if (!ready.length) {
+        State.batchPreview = items;
+        render();
+        showToast('这批词还没有完整资料，请按每条提示逐个补充。');
+        return;
+      }
+      const bookId = Number(State.batchNotebookId || State.activeNotebookId);
+      const existingWords = new Set(State.words.map(word => normalizeLookupTerm(word.word)));
+      let added = 0;
+      for (const item of ready) {
+        ensureBilingualExample(item);
+        if (!item.emoji || item.emoji === EMOJI_MAP.default) item.emoji = getEmoji(item.meaning, item.word);
+        if (existingWords.has(normalizeLookupTerm(item.word))) continue;
+        await DB.put('words', { ...item, notebookId: bookId, status: 'new', reviewCount: 0, lastReview: 0, nextReview: 0, errorCount: 0, createdAt: Date.now() + added });
+        added++;
+      }
+      State.words = await DB.all('words');
+      State.batchPreview = incomplete;
+      State.batchText = incomplete.map(item => item.word).join('\n');
+      State.batchEditIndex = null;
+      await ensureDailyLog();
+      render();
+      showToast(incomplete.length ? `已录入 ${added} 个；还有 ${incomplete.length} 个待补充` : `已录入 ${added} 个单词到“${notebookName(bookId)}”`);
+    }
+
+    /** 批量预览词条的单条补充入口。 */
+    document.addEventListener('click', (event) => {
+      const target = event.target.closest('[data-action]');
+      if (!target) return;
+      if (target.dataset.action === 'edit-batch-item') {
+        event.preventDefault();
+        event.stopPropagation();
+        State.batchEditIndex = Number(target.dataset.index);
+        State.editingWordId = null;
+        State.wordImageDraft = null;
+        State.wordImageSource = null;
+        State.wordImageTitle = '';
+        render();
+        setTimeout(() => $('#wordForm [name="meaning"]')?.focus(), 0);
+      }
+      if (target.dataset.action === 'parse-batch' || target.dataset.action === 'cancel-edit') State.batchEditIndex = null;
+    }, true);
+
+    /** 最终版保存：批量单条补充只更新预览，不会提前写入正式词库。 */
+    async function saveWordForm(form) {
+      const data = Object.fromEntries(new FormData(form).entries());
+      const batchIndex = Number.isInteger(State.batchEditIndex) ? State.batchEditIndex : null;
+      const existing = data.id ? State.words.find(word => word.id === Number(data.id)) : null;
+      const base = batchIndex !== null ? State.batchPreview[batchIndex] : existing;
+      const next = { ...(base || { status: 'new', reviewCount: 0, lastReview: 0, nextReview: 0, errorCount: 0, createdAt: Date.now() }), word: String(data.word || '').trim(), notebookId: Number(data.notebookId || State.batchNotebookId || State.activeNotebookId), phonetic: String(data.phonetic || '').trim(), meaning: String(data.meaning || '').trim(), exampleEn: String(data.exampleEn || '').trim(), exampleCn: String(data.exampleCn || '').trim(), imageUrl: State.wordImageDraft !== null ? State.wordImageDraft : String(data.imageUrl || '').trim(), imageSource: existing?.imageSource || '', imageTitle: existing?.imageTitle || '', emoji: String(data.emoji || '').trim(), hint: String(data.hint || '').trim() };
+      if (!next.word) { showToast('请先填写英文单词或词组'); return; }
+      if (!next.meaning || !next.exampleEn || !next.exampleCn || !next.phonetic || batchIndex !== null) { showToast('正在补全音标和中英文例句…'); await lookupWordOnline(next); }
+      if (!next.emoji || next.emoji === EMOJI_MAP.default) next.emoji = getEmoji(next.meaning, next.word);
+      const missing = missingBatchFields(next);
+      if (missing.length) { if (batchIndex !== null) State.batchPreview[batchIndex] = next; render(); showToast('仍缺少：' + missing.join('、') + '，请补充后再更新'); return; }
+      if (batchIndex !== null) { State.batchPreview[batchIndex] = next; State.batchEditIndex = null; render(); showToast('这条资料已补充完整'); return; }
+      const duplicate = State.words.find(word => normalizeLookupTerm(word.word) === normalizeLookupTerm(next.word) && word.id !== next.id);
+      if (duplicate) { showToast('词库里已经有这个单词啦'); return; }
+      await DB.put('words', next);
+      State.words = await DB.all('words');
+      State.editingWordId = null; State.wordImageDraft = null; State.wordImageSource = null; State.wordImageTitle = ''; State.imageStatus = '';
+      await ensureDailyLog();
+      showToast(existing ? '单词已更新' : '单词已加入词库');
+      render();
+    }
+
     init();
   </script>
 </body>
