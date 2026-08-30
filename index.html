@@ -273,6 +273,16 @@
     .word-row.clickable:hover { border-color: #a9d2ff; box-shadow: 0 8px 20px rgba(0,122,255,.08); }
     .word-row-actions { display: flex; align-items: center; gap: 5px; }
     .word-row-actions .mini-btn { min-width: 40px; }
+    .notebook-bar { display: grid; gap: 7px; padding: 13px 14px; border: 1px solid #dcecff; border-radius: 16px; background: linear-gradient(135deg,#f7fbff,#fff); }
+    .notebook-bar label { color: var(--text-secondary); font-size: 12px; font-weight: 750; }
+    .notebook-select { min-height: 46px; font-weight: 800; color: var(--primary-dark); background: #fff; }
+    .notebook-grid { display: grid; gap: 10px; }
+    .notebook-card { display: grid; grid-template-columns: 48px 1fr auto; align-items: center; gap: 12px; padding: 13px; border: 1px solid var(--border); border-radius: 16px; background: #fff; }
+    .notebook-icon { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 15px; font-size: 25px; background: #eef6ff; }
+    .notebook-card .tiny { line-height: 1.45; }
+    .notebook-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+    .notebook-actions .mini-btn { min-width: 44px; }
+    .move-select { min-height: 44px; max-width: 170px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 10px; background: #fff; color: var(--primary-dark); font-size: 12px; font-weight: 750; }
     .word-card-modal { width: min(100%, 460px); max-height: 90vh; overflow: auto; padding: 22px; background: #fff; border-radius: 24px; box-shadow: 0 28px 80px rgba(13,26,56,.22); }
     .word-card-modal .modal-visual { margin: 12px auto 16px; }
     .word-card-modal .modal-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 20px; }
@@ -318,7 +328,7 @@
 
     /** 轻量本地数据层：优先 IndexedDB，遇到 Safari 隐私模式或数据库异常时自动降级。 */
     class PETDatabase {
-      constructor() { this.db = null; this.fallback = false; this.DB_NAME = 'PETWordDB'; this.DB_VERSION = 1; this.fallbackKey = 'PETWordDB_FALLBACK'; }
+      constructor() { this.db = null; this.fallback = false; this.DB_NAME = 'PETWordDB'; this.DB_VERSION = 2; this.fallbackKey = 'PETWordDB_FALLBACK'; }
       async init() {
         if (!('indexedDB' in window)) { this.fallback = true; return this.loadFallback(); }
         try {
@@ -329,20 +339,21 @@
               if (!db.objectStoreNames.contains('words')) { const store = db.createObjectStore('words', { keyPath: 'id', autoIncrement: true }); store.createIndex('word', 'word', { unique: false }); store.createIndex('nextReview', 'nextReview', { unique: false }); }
               if (!db.objectStoreNames.contains('settings')) db.createObjectStore('settings', { keyPath: 'key' });
               if (!db.objectStoreNames.contains('dailyLog')) { const log = db.createObjectStore('dailyLog', { keyPath: 'id', autoIncrement: true }); log.createIndex('date', 'date', { unique: false }); }
+              if (!db.objectStoreNames.contains('notebooks')) { const books = db.createObjectStore('notebooks', { keyPath: 'id', autoIncrement: true }); books.createIndex('name', 'name', { unique: false }); books.createIndex('sortOrder', 'sortOrder', { unique: false }); }
             };
             request.onsuccess = () => { this.db = request.result; resolve(); };
             request.onerror = () => reject(request.error || new Error('IndexedDB unavailable'));
           });
         } catch (error) { this.fallback = true; this.loadFallback(); }
       }
-      loadFallback() { try { this.fallbackData = JSON.parse(localStorage.getItem(this.fallbackKey) || '{"words":[],"settings":[],"dailyLog":[]}'); } catch { this.fallbackData = { words: [], settings: [], dailyLog: [] }; } }
+      loadFallback() { try { this.fallbackData = JSON.parse(localStorage.getItem(this.fallbackKey) || '{"words":[],"settings":[],"dailyLog":[],"notebooks":[]}'); } catch { this.fallbackData = { words: [], settings: [], dailyLog: [], notebooks: [] }; } }
       saveFallback() { localStorage.setItem(this.fallbackKey, JSON.stringify(this.fallbackData)); }
       async all(storeName) { if (this.fallback) return [...(this.fallbackData[storeName] || [])]; return new Promise((resolve, reject) => { const req = this.db.transaction(storeName, 'readonly').objectStore(storeName).getAll(); req.onsuccess = () => resolve(req.result || []); req.onerror = () => reject(req.error); }); }
       async get(storeName, key) { if (this.fallback) return (this.fallbackData[storeName] || []).find(item => item.id === key || item.key === key) || null; return new Promise((resolve, reject) => { const req = this.db.transaction(storeName, 'readonly').objectStore(storeName).get(key); req.onsuccess = () => resolve(req.result || null); req.onerror = () => reject(req.error); }); }
       async put(storeName, value) {
         if (this.fallback) {
           const list = this.fallbackData[storeName] || (this.fallbackData[storeName] = []);
-          if (storeName === 'words' || storeName === 'dailyLog') {
+          if (storeName === 'words' || storeName === 'dailyLog' || storeName === 'notebooks') {
             if (!value.id) value.id = list.reduce((max, item) => Math.max(max, item.id || 0), 0) + 1;
           }
           const index = list.findIndex(item => (storeName === 'settings' ? item.key === value.key : item.id === value.id));
@@ -366,15 +377,17 @@
 
     const DB = new PETDatabase();
     const State = {
-      route: '/learn', currentUser: 'child', today: todayKey(), settings: { ...DEFAULT_SETTINGS }, words: [], logs: [],
+      route: '/learn', currentUser: 'child', today: todayKey(), settings: { ...DEFAULT_SETTINGS }, words: [], logs: [], notebooks: [], activeNotebookId: null, legacyWordsPresent: false,
       currentTask: null, guidePage: 0, showGuide: false, stageAReadyAt: 0, stageAFlipped: false, stageB: null, spell: null, weeklyTest: null,
       adminTab: 'overview', adminLoggedIn: false, adminSearch: '', adminPage: 1, editingWordId: null, batchPreview: [], importPayload: null,
-      wordSearch: '', batchText: '', batchLookupRunning: false, ocrStatus: '', selectedWordId: null, toastTimer: null, wordImageDraft: null, wordImageSource: null, wordImageTitle: '', imageStatus: ''
+      wordSearch: '', batchText: '', batchLookupRunning: false, ocrStatus: '', selectedWordId: null, toastTimer: null, wordImageDraft: null, wordImageSource: null, wordImageTitle: '', imageStatus: '', notebookSearch: '', notebookEditingId: null
     };
 
     /** 读取本地数据，并在首次启动时写入示例词。 */
     async function hydrate() {
       State.words = await DB.all('words');
+      /* 先记录启动前是否已有旧词；这样首次自动写入的示例词会直接进入 PET核心单词。 */
+      State.legacyWordsPresent = State.words.length > 0;
       if (!State.words.length) {
         const now = Date.now();
         await DB.bulkPut('words', SAMPLE_WORDS.map((word, index) => ({ ...word, status: 'new', reviewCount: 0, lastReview: 0, nextReview: 0, errorCount: 0, createdAt: now + index })));
@@ -406,6 +419,7 @@
         State.settings.coins = expectedCoins;
       }
       State.showGuide = localStorage.getItem('petWelcomeSeen') !== 'true';
+      await ensureNotebooks();
     }
 
     /** 将日期对应的学习计划固定下来，避免完成一词后任务顺序漂移。 */
@@ -1335,6 +1349,225 @@
       State.words = await DB.all('words'); State.batchPreview = []; await ensureDailyLog();
       showToast(added ? `已录入 ${added} 个单词` : '没有新增词条，请检查释义或重复项'); render();
     }
+    /* ==================== 多单词本 ==================== */
+    const NOTEBOOK_DEFAULT_SPECS = [
+      { name: 'PET核心单词', icon: '📘', color: '#e7f2ff' },
+      { name: 'PET强化单词', icon: '🚀', color: '#fff2dd' },
+      { name: '日常阅读累积单词', icon: '📚', color: '#eeeaff' }
+    ];
+    const NOTEBOOK_MIGRATION_SPEC = { name: '待整理（原词库）', icon: '🗂️', color: '#f0f2f6', isMigration: true };
+
+    /** 创建单词本并把旧版词条安全迁移到“待整理”单词本。 */
+    async function ensureNotebooks(legacyWords = State.legacyWordsPresent) {
+      let books = await DB.all('notebooks');
+      if (!books.length) {
+        const specs = legacyWords ? [NOTEBOOK_MIGRATION_SPEC, ...NOTEBOOK_DEFAULT_SPECS] : NOTEBOOK_DEFAULT_SPECS;
+        for (let index = 0; index < specs.length; index++) {
+          await DB.put('notebooks', { ...specs[index], sortOrder: index, createdAt: Date.now() + index, archived: false });
+        }
+        books = await DB.all('notebooks');
+      }
+      books = books.map((book, index) => ({ ...book, name: String(book.name || ('单词本' + (index + 1))).trim(), icon: book.icon || '📚', color: book.color || '#e7f2ff', sortOrder: Number.isFinite(Number(book.sortOrder)) ? Number(book.sortOrder) : index, archived: Boolean(book.archived) }));
+      books.sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id);
+      const migration = books.find(book => book.isMigration) || books.find(book => book.name.indexOf('待整理') >= 0);
+      const fallbackBookId = migration?.id || books[0]?.id;
+      for (const word of State.words) {
+        const targetId = Number(word.notebookId);
+        if (!targetId || !books.some(book => book.id === targetId)) await DB.put('words', { ...word, notebookId: fallbackBookId });
+      }
+      for (const log of State.logs) {
+        if (!Number(log.notebookId)) await DB.put('dailyLog', { ...log, notebookId: fallbackBookId });
+      }
+      State.words = await DB.all('words');
+      State.logs = await DB.all('dailyLog');
+      State.notebooks = (await DB.all('notebooks')).map((book, index) => ({ ...book, sortOrder: Number.isFinite(Number(book.sortOrder)) ? Number(book.sortOrder) : index })).sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id);
+      const savedActive = Number(State.settings.activeNotebookId);
+      State.activeNotebookId = State.notebooks.some(book => book.id === savedActive) ? savedActive : (fallbackBookId || State.notebooks[0]?.id || null);
+      State.settings.activeNotebookId = State.activeNotebookId;
+      State.batchNotebookId = State.activeNotebookId;
+      await DB.put('settings', State.settings);
+    }
+    function activeNotebook() { return State.notebooks.find(book => book.id === Number(State.activeNotebookId)) || State.notebooks[0] || null; }
+    function notebookName(id) { return State.notebooks.find(book => book.id === Number(id))?.name || '未分类'; }
+    function notebookWords(id = State.activeNotebookId) { return State.words.filter(word => Number(word.notebookId) === Number(id)); }
+    function notebookOptionsHtml(name, selectedId = State.activeNotebookId) {
+      return State.notebooks.map(book => '<option value="' + book.id + '" ' + (Number(book.id) === Number(selectedId) ? 'selected' : '') + '>' + escapeHtml(book.icon || '📚') + ' ' + escapeHtml(book.name) + '</option>').join('');
+    }
+    function notebookSelector(label = '当前学习单词本', selectedId = State.activeNotebookId) {
+      return '<div class="notebook-bar"><label>' + escapeHtml(label) + '</label><select class="select notebook-select" name="notebookId" data-input="active-notebook" aria-label="' + escapeHtml(label) + '">' + notebookOptionsHtml('activeNotebook', selectedId) + '</select></div>';
+    }
+    async function switchActiveNotebook(id) {
+      const nextId = Number(id);
+      if (!State.notebooks.some(book => book.id === nextId)) return;
+      if (State.currentTask && !confirm('切换单词本会退出当前学习，已经完成的内容会保留。要切换吗？')) { render(); return; }
+      State.currentTask = null; State.stageB = null; State.spell = null; State.weeklyTest = null;
+      State.activeNotebookId = nextId; State.settings.activeNotebookId = nextId; State.batchNotebookId = nextId;
+      await DB.put('settings', State.settings); await ensureDailyLog(); render();
+      showToast('已切换到“' + notebookName(nextId) + '”');
+    }
+    /** 每个单词本独立生成今日任务，复习算法和每日数量保持原规则。 */
+    async function ensureDailyLog() {
+      const bookId = Number(State.activeNotebookId || activeNotebook()?.id);
+      let log = State.logs.find(item => item.date === State.today && Number(item.notebookId) === bookId);
+      const live = id => State.words.some(word => word.id === id && Number(word.notebookId) === bookId);
+      const completedNew = unique((log?.wordsStudied || []).filter(live));
+      const completedReview = unique((log?.wordsReviewed || []).filter(live));
+      const currentNew = unique((log?.plannedNew || []).filter(live));
+      const currentReview = unique((log?.plannedReview || []).filter(live));
+      const usedNew = new Set([...completedNew, ...currentNew]);
+      const availableNew = notebookWords(bookId).filter(word => word.status === 'new' && !usedNew.has(word.id)).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+      const usedReview = new Set([...completedReview, ...currentReview]);
+      const due = notebookWords(bookId).filter(word => word.status !== 'new' && (word.nextReview || 0) <= dateStart(State.today) && !usedReview.has(word.id))
+        .sort((a, b) => (a.status === 'struggling' ? -1 : 1) - (b.status === 'struggling' ? -1 : 1) || (b.errorCount || 0) - (a.errorCount || 0) || (a.nextReview || 0) - (b.nextReview || 0));
+      const masteredFallback = notebookWords(bookId).filter(word => word.status === 'mastered' && !usedReview.has(word.id) && !due.some(item => item.id === word.id)).sort((a, b) => (a.lastReview || 0) - (b.lastReview || 0));
+      const settingsMatch = Boolean(log && log.dailyNew === State.settings.dailyNew && log.dailyReview === State.settings.dailyReview);
+      let plannedNew = settingsMatch ? currentNew : unique([...completedNew, ...currentNew]);
+      let plannedReview = settingsMatch ? currentReview : unique([...completedReview, ...currentReview]);
+      if (plannedNew.length < State.settings.dailyNew) plannedNew = unique([...plannedNew, ...availableNew.slice(0, State.settings.dailyNew - plannedNew.length).map(word => word.id)]);
+      if (plannedReview.length < State.settings.dailyReview) plannedReview = unique([...plannedReview, ...[...due, ...masteredFallback].slice(0, State.settings.dailyReview - plannedReview.length).map(word => word.id)]);
+      const total = plannedNew.length + plannedReview.length;
+      const nextLog = { ...(log || {}), date: State.today, notebookId: bookId, wordsStudied: completedNew, wordsReviewed: completedReview, coinsEarned: log?.coinsEarned || 0, durationMinutes: log?.durationMinutes || 0, completed: total > 0 && completedNew.length >= plannedNew.length && completedReview.length >= plannedReview.length, plannedNew, plannedReview, dailyNew: State.settings.dailyNew, dailyReview: State.settings.dailyReview, weeklyTestCompleted: log?.weeklyTestCompleted || false, weeklyTestMeaningScore: log?.weeklyTestMeaningScore || 0, weeklyTestSpellingScore: log?.weeklyTestSpellingScore || 0 };
+      if (log?.id !== undefined) nextLog.id = log.id;
+      await DB.put('dailyLog', nextLog); State.logs = await DB.all('dailyLog'); return nextLog;
+    }
+    async function getTodayTasks() {
+      const log = await ensureDailyLog();
+      return { log, newWords: log.plannedNew.map(id => State.words.find(word => word.id === id)).filter(word => word && Number(word.notebookId) === Number(State.activeNotebookId)), reviewWords: log.plannedReview.map(id => State.words.find(word => word.id === id)).filter(word => word && Number(word.notebookId) === Number(State.activeNotebookId)) };
+    }
+    function currentLog() { return State.logs.find(item => item.date === State.today && Number(item.notebookId) === Number(State.activeNotebookId)); }
+    function weekStats() {
+      const now = new Date(State.today + 'T12:00:00'); const day = (now.getDay() + 6) % 7; const start = new Date(now); start.setDate(now.getDate() - day); start.setHours(0, 0, 0, 0);
+      const keys = []; for (let i = 0; i < 7; i++) { const d = new Date(start); d.setDate(start.getDate() + i); keys.push(dateKeyFromDate(d)); }
+      const logs = State.logs.filter(log => keys.includes(log.date) && Number(log.notebookId) === Number(State.activeNotebookId));
+      const studied = unique(logs.flatMap(log => log.wordsStudied || [])); return { completed: Math.min(30, studied.length), days: logs.filter(log => log.completed || (log.wordsStudied || []).length || (log.wordsReviewed || []).length).length, keys, logs, coins: logs.reduce((sum, log) => sum + (log.coinsEarned || 0), 0) };
+    }
+    function getWeeklyTestWords() {
+      const ids = unique(State.logs.filter(log => Number(log.notebookId) === Number(State.activeNotebookId) && dateStart(log.date) < dateStart(State.today)).sort((a, b) => dateStart(b.date) - dateStart(a.date)).flatMap(log => [...(log.wordsStudied || []), ...(log.wordsReviewed || [])])).slice(0, 30);
+      return ids.map(id => State.words.find(word => word.id === id && Number(word.notebookId) === Number(State.activeNotebookId))).filter(Boolean);
+    }
+    function taskProgressText() { const log = currentLog() || {}; const ids = State.currentTask?.type === 'review' ? (log.plannedReview || []) : (log.plannedNew || []); const done = State.currentTask?.type === 'review' ? (log.wordsReviewed || []) : (log.wordsStudied || []); const index = Math.max(0, ids.indexOf(State.currentTask?.wordId)); return Math.min(index + 1, ids.length) + ' / ' + ids.length; }
+
+    function renderDashboard() {
+      const log = currentLog() || { wordsStudied: [], wordsReviewed: [], plannedNew: [], plannedReview: [] }; const newWords = (log.plannedNew || []).map(id => State.words.find(word => word.id === id)).filter(Boolean); const reviewWords = (log.plannedReview || []).map(id => State.words.find(word => word.id === id)).filter(Boolean); const newDone = (log.wordsStudied || []).length; const reviewDone = (log.wordsReviewed || []).length; const total = newWords.length + reviewWords.length; const newComplete = newWords.length === 0 || newDone >= newWords.length; const reviewComplete = reviewWords.length === 0 || reviewDone >= reviewWords.length; const dailyDone = total > 0 && newComplete && reviewComplete; const week = weekStats(); const growth = growthStats(); const percent = Math.min(100, Math.round(week.completed / 30 * 100)); const book = activeNotebook();
+      const newButton = newWords.length ? '<button class="btn ' + (newComplete ? 'btn-secondary' : 'btn-primary') + ' btn-block" data-action="start-task" data-type="new" ' + (newComplete ? 'disabled' : '') + '>' + (newComplete ? '新词已学完' : '开始新词学习 →') + '</button>' : '<button class="btn btn-primary btn-block" data-action="open-admin-tab" data-tab="add">' + (State.words.length ? '这个词本暂无新词' : '先添加学习单词 →') + '</button>';
+      const reviewButton = reviewWords.length ? '<button class="btn ' + (!newComplete || reviewComplete ? 'btn-secondary' : 'btn-warning') + ' btn-block" data-action="start-task" data-type="review" ' + (!newComplete || reviewComplete ? 'disabled' : '') + '>' + (reviewComplete ? '复习已完成' : !newComplete ? '完成新词后解锁' : '开始复习 →') + '</button>' : '<button class="btn btn-secondary btn-block" disabled>今天没有到期复习词</button>';
+      return '<section class="screen"><header class="topbar"><div class="brand-lockup"><div class="brand-mark">' + escapeHtml(book?.icon || '📚') + '</div><div><div class="brand-title">希希词语家</div><div class="brand-subtitle">当前学习：' + escapeHtml(book?.name || '单词本') + '</div></div></div></header><div class="stack">' + notebookSelector() + '<section class="card hero-card"><div class="eyebrow">本周学习进度</div><div class="hero-number">' + week.completed + '<span> / 30 个词</span></div><div>每天一点点，词汇会长大 🌱</div><div class="progress-track"><div class="progress-fill" style="width:' + percent + '%"></div></div><div class="progress-meta"><span>' + (week.completed ? '已经坚持 ' + week.days + ' 天' : '今天也来学一点') + '</span><span>' + percent + '%</span></div></section><section class="card coin-hero"><div class="eyebrow">个人打卡榜 · 我的希币</div><div class="coin-number">' + growth.coins + '<span> 希币</span></div><div>积分 ' + growth.coins + ' 分 · 今天 +' + growth.todayCoins + ' 希币</div><button class="btn" style="margin-top:15px;color:#9a5600;background:#fff" data-action="open-admin-tab" data-tab="overview">查看成长榜 →</button></section><section class="stack"><div class="section-heading"><h2>今天学什么</h2><span class="badge ' + (dailyDone ? 'green' : total ? 'blue' : 'orange') + '">' + (dailyDone ? '全部完成' : total ? (newDone + reviewDone) + ' / ' + total : '先添加单词') + '</span></div><article class="card task-card new-task"><div class="row between"><div class="task-icon">📘</div><span class="task-status ' + (newComplete ? '' : 'pending') + '">' + (newComplete ? '已完成 ✅' : '新词任务') + '</span></div><div><div class="task-title">今日新学 · ' + newWords.length + ' 个</div><div class="task-caption">' + (newWords.length ? '认识新朋友，完成拼写就能获得希币。' : '这个单词本今天没有安排新的学习词条。') + '</div></div>' + (newWords.length ? '<div class="word-preview">' + newWords.map(word => escapeHtml(word.word)).join(' · ') + '</div>' : '') + newButton + '</article><article class="card task-card review-task ' + (!newComplete ? 'locked' : '') + '"><div class="row between"><div class="task-icon">📙</div><span class="task-status ' + (reviewComplete ? '' : newComplete ? 'pending' : 'lock') + '">' + (reviewComplete ? '已完成 ✅' : !newComplete ? '🔒 待解锁' : '复习任务') + '</span></div><div><div class="task-title">今日复习 · ' + reviewWords.length + ' 个</div><div class="task-caption">' + (!newComplete ? '完成今日新词后，就能开始复习啦。' : reviewWords.length ? '把学过的单词再叫醒一次。' : '今天没有到期复习词，轻松完成！') + '</div></div>' + reviewButton + '</article></section>' + renderWeeklyTestCard(getWeeklyTestWords()) + '<section class="card card-pad"><div class="row between"><div><h3>' + (dailyDone ? '今日完成！明天见 🌟' : '准备好了吗？') + '</h3><p class="muted small" style="margin-top:6px">' + (dailyDone ? '你的学习和希币都已经被记录下来。' : '当前学习单词本：' + escapeHtml(book?.name || '') + '。每个新词完成拼写后，会获得1枚希币。') + '</p></div><div style="font-size:35px">' + (dailyDone ? '🎉' : '🧠') + '</div></div></section></div>' + navBar() + '</section>';
+    }
+
+    function renderWords() {
+      const query = State.wordSearch.trim().toLowerCase(); const words = notebookWords().filter(word => !query || word.word.toLowerCase().includes(query) || String(word.meaning || '').toLowerCase().includes(query));
+      return '<section class="screen">' + pageTop('词库', (activeNotebook()?.name || '单词本') + ' · ' + words.length + ' 个') + '<div class="stack">' + notebookSelector('当前查看单词本') + '<div class="search-box"><span>⌕</span><input class="input" style="padding-left:42px" data-input="word-search" value="' + escapeHtml(State.wordSearch) + '" placeholder="搜索英文、短语或中文释义" aria-label="搜索词库"></div><div class="row between"><div><h2>' + escapeHtml(activeNotebook()?.name || '我的单词本') + '</h2><p class="muted tiny" style="margin-top:5px">点击单词查看完整单词卡</p></div><span class="muted small">' + words.length + ' 个结果</span></div><div class="word-list">' + (words.length ? words.map(word => '<article class="word-row clickable" data-action="open-word-card" data-id="' + word.id + '">' + wordVisual(word) + '<div style="min-width:0"><div class="row" style="gap:7px;flex-wrap:wrap"><span class="word-name">' + escapeHtml(word.word) + '</span>' + statusBadge(word) + '</div><div class="word-meaning">' + escapeHtml(word.meaning || '中文释义待补充') + (word.phonetic ? ' · ' + escapeHtml(word.phonetic) : '') + '</div></div><div class="word-row-actions"><button class="mini-btn" data-action="speak" data-id="' + word.id + '" aria-label="朗读 ' + escapeHtml(word.word) + '">🔊</button><button class="mini-btn blue" data-action="edit-word" data-id="' + word.id + '">编辑</button><button class="mini-btn red" data-action="delete-word" data-id="' + word.id + '">删除</button></div></article>').join('') : '<div class="card empty"><div class="empty-icon">📚</div><p>这个单词本还没有词条</p><button class="btn btn-primary" style="margin-top:14px" data-action="open-admin-tab" data-tab="add">添加第一个单词</button></div>') + '</div></div>' + navBar() + '</section>';
+    }
+
+    function renderAdminAdd() {
+      const edit = State.editingWordId ? State.words.find(word => word.id === State.editingWordId) : null; const image = imageDraftFor(edit);
+      const preview = State.batchPreview.length ? '<div class="preview-list" style="margin-top:15px">' + State.batchPreview.map(item => '<div class="preview-item"><div class="row between"><strong>' + escapeHtml(item.emoji || getEmoji(item.meaning)) + ' ' + escapeHtml(item.word) + '</strong>' + statusBadge({ status: 'new' }) + '</div><div class="muted small" style="margin-top:5px">' + escapeHtml(item.meaning || '等待在线补全中文释义') + '</div>' + (item.phonetic ? '<div class="tiny" style="margin-top:5px">音标：' + escapeHtml(item.phonetic) + '</div>' : '') + (item.exampleEn ? '<div class="tiny" style="margin-top:5px">例句：' + escapeHtml(item.exampleEn) + (item.exampleCn ? ' · ' + escapeHtml(item.exampleCn) : '') + '</div>' : '<div class="tiny" style="margin-top:5px;color:var(--warning)">等待自动补全中英文例句</div>') + '</div>').join('') + '</div>' : '';
+      return '<div class="admin-layout"><div class="stack"><section class="card card-pad"><div class="eyebrow">当前录入单词本</div><h2 style="margin-top:7px">' + escapeHtml(notebookName(State.batchNotebookId || State.activeNotebookId)) + '</h2>' + notebookSelector('录入后归属单词本', State.batchNotebookId || State.activeNotebookId) + '<p class="muted small" style="line-height:1.6;margin-top:10px">批量录入和拍照识别的词条会进入当前单词本。</p></section><section class="card card-pad"><div class="eyebrow">📷 拍照识别</div><h2 style="margin-top:7px">拍下英文词表</h2><p class="muted small" style="line-height:1.65;margin-top:9px">可以拍照或从相册选择，识别出的英文单词和词组会放入下面的批量输入框。</p><label class="btn btn-primary btn-block" style="margin-top:15px">📷 拍照 / 选择图片<input type="file" accept="image/*" capture="environment" data-input="ocr-file" hidden></label><div class="tiny muted" data-ocr-status style="margin-top:11px">' + escapeHtml(State.ocrStatus || '上传前会先询问你是否同意，照片不会自动上传。') + '</div></section><section class="card card-pad"><div class="row between"><div><div class="eyebrow">批量录入</div><h2 style="margin-top:7px">每行一个单词或词组</h2></div><span class="badge blue">自动补全</span></div><textarea class="textarea" style="margin-top:15px" data-input="batch-text" placeholder="a variety of\npublic transport\naccommodation /əˌkɒməˈdeɪʃn/ 住处，住宿">' + escapeHtml(State.batchText) + '</textarea><div class="row wrap" style="margin-top:12px"><button class="btn btn-secondary" data-action="parse-batch">解析并预览</button>' + (State.batchPreview.length ? '<button class="btn btn-primary" data-action="lookup-batch" ' + (State.batchLookupRunning ? 'disabled' : '') + '>' + (State.batchLookupRunning ? '补全中…' : '🌐 在线补全') + '</button><button class="btn btn-success" data-action="save-batch" ' + (State.batchLookupRunning ? 'disabled' : '') + '>确认录入 ' + State.batchPreview.length + ' 个</button>' : '') + '</div>' + (State.batchPreview.length ? '<div class="tiny muted" data-online-status style="margin-top:10px">会通过网络查询资料，请录入前快速确认释义。</div>' : '') + preview + '</section></div><section class="card card-pad"><div class="eyebrow">' + (edit ? '编辑单词' : '逐条添加') + '</div><h2 style="margin-top:7px">' + (edit ? '编辑 ' + escapeHtml(edit.word) : '手动录入') + '</h2><form id="wordForm" class="field-grid" style="margin-top:16px"><input type="hidden" name="id" value="' + (edit?.id || '') + '"><label class="field"><span>英文单词或词组 *</span><input class="input" name="word" required value="' + escapeHtml(edit?.word || '') + '" placeholder="例如 a variety of"></label>' + (notebookSelector('所属单词本', edit?.notebookId || State.activeNotebookId).replace('data-input="active-notebook"', 'data-input="form-notebook"')) + '<div class="field-grid two"><label class="field"><span>音标</span><input class="input" name="phonetic" value="' + escapeHtml(edit?.phonetic || '') + '" placeholder="自动补全"></label><label class="field"><span>中文释义</span><input class="input" name="meaning" value="' + escapeHtml(edit?.meaning || '') + '" placeholder="保存时自动补全"></label></div><label class="field"><span>英文例句</span><textarea class="textarea" style="min-height:90px" name="exampleEn" placeholder="在线词典有例句时会自动填入">' + escapeHtml(edit?.exampleEn || '') + '</textarea></label><label class="field"><span>中文翻译</span><input class="input" name="exampleCn" value="' + escapeHtml(edit?.exampleCn || '') + '" placeholder="自动翻译"></label><label class="field"><span>图片链接（可选）</span><input class="input" name="imageUrl" data-input="word-image-url" value="' + escapeHtml(image) + '" placeholder="粘贴图片链接 https://..."></label>' + renderImagePicker(edit) + '<div class="field-grid two"><label class="field"><span>Emoji 兜底</span><input class="input" name="emoji" value="' + escapeHtml(edit?.emoji || '') + '" placeholder="自动匹配"></label><label class="field"><span>记忆提示</span><textarea class="textarea" style="min-height:80px" name="hint" placeholder="词根拆解或联想故事">' + escapeHtml(edit?.hint || '') + '</textarea></label></div><div class="row wrap"><button class="btn btn-secondary" type="button" data-action="lookup-form">🌐 在线补全</button><button class="btn btn-primary" type="submit">' + (edit ? '保存修改' : '加入词库') + '</button>' + (edit ? '<button class="btn btn-secondary" type="button" data-action="cancel-edit">取消</button>' : '') + '</div></form></section></div>';
+    }
+    function renderAdminManage() {
+      const bookId = Number(State.activeNotebookId); const query = State.adminSearch.toLowerCase(); const filtered = notebookWords(bookId).filter(word => !query || word.word.toLowerCase().includes(query) || String(word.meaning || '').includes(query)); const totalPages = Math.max(1, Math.ceil(filtered.length / 20)); State.adminPage = Math.min(State.adminPage, totalPages); const page = filtered.slice((State.adminPage - 1) * 20, State.adminPage * 20);
+      return '<section class="card card-pad"><div class="row between wrap"><div><div class="eyebrow">词库管理</div><h2 style="margin-top:7px">' + escapeHtml(notebookName(bookId)) + '</h2><p class="muted tiny" style="margin-top:5px">可以编辑、删除或移动单词</p></div><span class="badge blue">' + filtered.length + ' 个</span></div>' + notebookSelector('当前管理单词本') + '<div class="search-box" style="margin-top:17px"><span>⌕</span><input class="input" style="padding-left:42px" data-input="admin-search" value="' + escapeHtml(State.adminSearch) + '" placeholder="按英文或中文搜索"></div><div class="admin-table-wrap" style="margin-top:13px"><table class="admin-table"><thead><tr><th>词语</th><th>音标</th><th>释义</th><th>移动到</th><th>状态</th><th>操作</th></tr></thead><tbody>' + (page.length ? page.map(word => '<tr><td><div class="row">' + wordVisual(word) + '<strong>' + escapeHtml(word.word) + '</strong></div></td><td class="muted">' + escapeHtml(word.phonetic || '—') + '</td><td>' + escapeHtml(word.meaning || '中文释义待补充') + '</td><td><select class="move-select" data-input="move-word" data-id="' + word.id + '" aria-label="移动 ' + escapeHtml(word.word) + '">' + notebookOptionsHtml('move-' + word.id, word.notebookId) + '</select></td><td>' + statusBadge(word) + '</td><td><div class="table-actions"><button class="mini-btn blue" data-action="edit-word" data-id="' + word.id + '">编辑</button><button class="mini-btn red" data-action="delete-word" data-id="' + word.id + '">删除</button></div></td></tr>').join('') : '<tr><td colspan="6" class="empty">这个单词本还没有词条</td></tr>') + '</tbody></table></div><div class="row between" style="margin-top:15px"><span class="muted small">第 ' + State.adminPage + ' / ' + totalPages + ' 页</span><div class="row"><button class="mini-btn" data-action="admin-page" data-delta="-1" ' + (State.adminPage <= 1 ? 'disabled' : '') + '>上一页</button><button class="mini-btn" data-action="admin-page" data-delta="1" ' + (State.adminPage >= totalPages ? 'disabled' : '') + '>下一页</button></div></div></section>';
+    }
+    function renderNotebookManager() {
+      const cards = State.notebooks.map(book => { const count = notebookWords(book.id).length; return '<div class="notebook-card"><div class="notebook-icon" style="background:' + escapeHtml(book.color || '#eef6ff') + '">' + escapeHtml(book.icon || '📚') + '</div><div><strong>' + escapeHtml(book.name) + '</strong><div class="muted tiny" style="margin-top:4px">' + count + ' 个单词' + (book.isMigration ? ' · 升级时保留的原词库' : '') + '</div></div><div class="notebook-actions"><button class="mini-btn blue" data-action="rename-notebook" data-id="' + book.id + '">改名</button>' + (count ? '<button class="mini-btn" disabled>先移动</button>' : '<button class="mini-btn red" data-action="delete-notebook" data-id="' + book.id + '">删除</button>') + '</div></div>'; }).join('');
+      return '<div class="admin-layout"><div class="stack"><section class="card card-pad"><div class="eyebrow">选择学习内容</div><h2 style="margin-top:7px">管理我的单词本</h2><p class="muted small" style="line-height:1.65;margin-top:9px">每个单词只属于一个单词本。学习、复习和周五检测会跟随当前选择的单词本。</p>' + notebookSelector('当前学习单词本') + '</section><section class="card card-pad"><div class="eyebrow">新建单词本</div><form id="notebookForm" class="field-grid" style="margin-top:14px"><label class="field"><span>单词本名称</span><input class="input" name="name" required placeholder="例如 PET写作词组"></label><div class="field-grid two"><label class="field"><span>图标</span><select class="select" name="icon"><option>📘</option><option>🚀</option><option>📚</option><option>🌟</option><option>🧩</option><option>🌍</option></select></label><label class="field"><span>颜色</span><select class="select" name="color"><option value="#e7f2ff">蓝色</option><option value="#fff2dd">橙色</option><option value="#eeeaff">紫色</option><option value="#e9f9ed">绿色</option></select></label></div><button class="btn btn-primary btn-block" type="submit">新建单词本</button></form></section></div><section class="card card-pad"><div class="row between"><div><div class="eyebrow">我的单词本</div><h2 style="margin-top:7px">全部单词本</h2></div><span class="badge blue">' + State.notebooks.length + ' 个</span></div><div class="notebook-grid" style="margin-top:15px">' + cards + '</div></section></div>';
+    }
+    function renderAdminOverview() {
+      const growth = growthStats(); const hard = notebookWords().slice().sort((a, b) => (b.errorCount || 0) - (a.errorCount || 0)).slice(0, 5); const week = weekStats();
+      return '<div class="admin-layout"><div class="stack"><section class="card coin-hero"><div class="eyebrow">个人打卡榜 · 当前学习</div><div class="coin-number">' + growth.coins + '<span> 希币</span></div><div>当前单词本：' + escapeHtml(notebookName(State.activeNotebookId)) + ' · 本周完成 ' + week.completed + ' 个</div><button class="btn" style="margin-top:15px;color:#9a5600;background:#fff" data-action="admin-tab" data-tab="notebooks">管理单词本 →</button></section><section class="growth-grid"><div class="growth-stat"><div class="stat-number">' + growth.todayCoins + '</div><div class="stat-label">今日希币</div></div><div class="growth-stat"><div class="stat-number">' + growth.weekCoins + '</div><div class="stat-label">本周希币</div></div><div class="growth-stat"><div class="stat-number">' + growth.streak + '🔥</div><div class="stat-label">连续打卡</div></div><div class="growth-stat"><div class="stat-number">' + notebookWords().length + '</div><div class="stat-label">当前词本词数</div></div></section><section class="card card-pad"><div class="row between" style="margin-bottom:13px"><h2>当前词本易错词</h2><span class="badge orange">只用于排序</span></div>' + (hard.length ? '<div class="word-list">' + hard.map((word, index) => '<div class="row between" style="padding:11px 0;border-bottom:1px solid var(--border);cursor:pointer" data-action="open-word-card" data-id="' + word.id + '"><div class="row"><span style="width:24px;color:var(--text-secondary);font-weight:800">' + (index + 1) + '</span>' + wordVisual(word) + '<div><strong>' + escapeHtml(word.word) + '</strong><div class="muted tiny" style="margin-top:3px">' + escapeHtml(word.meaning || '') + '</div></div></div><span class="badge orange">' + (word.errorCount || 0) + ' 次</span></div>').join('') + '</div>' : '<div class="empty">还没有错误记录，继续保持！</div>') + '</section></div><div class="stack"><section class="card card-pad"><div class="eyebrow">本周学习趋势</div><div class="canvas-wrap" style="margin-top:12px"><canvas id="weeklyChart" width="800" height="360"></canvas></div></section><section class="card card-pad"><h3>快速入口</h3><div class="stack" style="gap:9px;margin-top:14px"><button class="btn btn-secondary btn-block" data-action="admin-tab" data-tab="add">添加新词 →</button><button class="btn btn-secondary btn-block" data-action="admin-tab" data-tab="manage">编辑或删除词库 →</button><button class="btn btn-secondary btn-block" data-action="admin-tab" data-tab="notebooks">管理单词本 →</button><button class="btn btn-secondary btn-block" data-action="admin-tab" data-tab="backup">导出备份 →</button></div></section></div></div>';
+    }
+    function renderAdminBackup() { return '<div class="admin-layout"><section class="card card-pad"><div class="eyebrow">数据备份</div><h2 style="margin-top:7px">带走你的学习记录</h2><p class="muted" style="line-height:1.7;margin-top:10px">导出文件包含单词本、词库、学习设置和每日记录。</p><button class="btn btn-primary btn-block" style="margin-top:18px" data-action="export-data">⬇️ 导出 JSON 备份</button></section><section class="card card-pad"><div class="eyebrow">数据恢复</div><h2 style="margin-top:7px">从备份继续</h2><p class="muted" style="line-height:1.7;margin-top:10px">导入旧版备份时，词条会自动放入当前单词本；新版备份会保留全部单词本。</p><label class="btn btn-secondary btn-block" style="margin-top:18px">⬆️ 选择 JSON 文件<input type="file" accept=".json,application/json" data-input="import-file" hidden></label><div class="notice" style="margin-top:14px">恢复数据会影响本机当前词库，操作前可以先导出一份当前备份。</div></section></div>'; }
+    function renderAdmin() {
+      const body = State.adminTab === 'overview' ? renderAdminOverview() : State.adminTab === 'add' ? renderAdminAdd() : State.adminTab === 'manage' ? renderAdminManage() : State.adminTab === 'notebooks' ? renderNotebookManager() : renderAdminBackup();
+      return '<section class="screen admin-screen"><header class="topbar"><div class="brand-lockup"><div class="brand-mark">📚</div><div><div class="brand-title">希希词语家</div><div class="brand-subtitle">当前单词本：' + escapeHtml(notebookName(State.activeNotebookId)) + '</div></div></div><button class="icon-btn" data-action="navigate" data-path="/learn" aria-label="返回学习">←</button></header><nav class="admin-nav"><button class="admin-tab ' + (State.adminTab === 'overview' ? 'active' : '') + '" data-action="admin-tab" data-tab="overview">🪙 成长榜</button><button class="admin-tab ' + (State.adminTab === 'add' ? 'active' : '') + '" data-action="admin-tab" data-tab="add">➕ 录入词库</button><button class="admin-tab ' + (State.adminTab === 'manage' ? 'active' : '') + '" data-action="admin-tab" data-tab="manage">📚 管理词库</button><button class="admin-tab ' + (State.adminTab === 'notebooks' ? 'active' : '') + '" data-action="admin-tab" data-tab="notebooks">🗂️ 单词本</button><button class="admin-tab ' + (State.adminTab === 'backup' ? 'active' : '') + '" data-action="admin-tab" data-tab="backup">💾 备份</button></nav>' + body + (State.importPayload ? renderImportModal() : '') + navBar() + '</section>';
+    }
+
+    /** 移动单词时保留历史积分，但从原单词本的未完成计划中移除。 */
+    async function moveWordToNotebook(wordId, targetId) {
+      const word = State.words.find(item => item.id === Number(wordId)); const book = State.notebooks.find(item => item.id === Number(targetId)); if (!word || !book || Number(word.notebookId) === Number(book.id)) return;
+      await DB.put('words', { ...word, notebookId: book.id });
+      for (const log of State.logs) {
+        const next = { ...log, plannedNew: (log.plannedNew || []).filter(id => id !== word.id), plannedReview: (log.plannedReview || []).filter(id => id !== word.id) };
+        if (JSON.stringify(next) !== JSON.stringify(log)) await DB.put('dailyLog', next);
+      }
+      State.words = await DB.all('words'); State.logs = await DB.all('dailyLog'); await ensureDailyLog(); render(); showToast('已移动到“' + book.name + '”');
+    }
+    async function createNotebook(form) {
+      const data = Object.fromEntries(new FormData(form).entries()); const name = String(data.name || '').trim(); if (!name) { showToast('请填写单词本名称'); return; }
+      if (State.notebooks.some(book => book.name.toLowerCase() === name.toLowerCase())) { showToast('已经有同名单词本啦'); return; }
+      const book = await DB.put('notebooks', { name, icon: String(data.icon || '📚'), color: String(data.color || '#e7f2ff'), sortOrder: State.notebooks.length, createdAt: Date.now(), archived: false });
+      State.notebooks = [...State.notebooks, book].sort((a, b) => a.sortOrder - b.sortOrder); State.adminTab = 'notebooks'; render(); showToast('单词本已创建');
+    }
+    async function renameNotebook(id) {
+      const book = State.notebooks.find(item => item.id === Number(id)); if (!book) return; const name = prompt('请输入新的单词本名称', book.name)?.trim(); if (!name || name === book.name) return;
+      if (State.notebooks.some(item => item.id !== book.id && item.name.toLowerCase() === name.toLowerCase())) { showToast('已经有同名单词本啦'); return; }
+      await DB.put('notebooks', { ...book, name }); State.notebooks = await DB.all('notebooks'); State.notebooks.sort((a, b) => a.sortOrder - b.sortOrder); render(); showToast('单词本名称已更新');
+    }
+    async function deleteNotebook(id) {
+      const book = State.notebooks.find(item => item.id === Number(id)); if (!book) return;
+      if (notebookWords(book.id).length) { showToast('请先把里面的单词移动到其他单词本'); return; }
+      if (State.notebooks.length <= 1) { showToast('至少要保留一个单词本'); return; }
+      if (!confirm('确定删除“' + book.name + '”吗？')) return;
+      await DB.delete('notebooks', book.id); State.notebooks = await DB.all('notebooks'); if (Number(State.activeNotebookId) === book.id) { State.activeNotebookId = State.notebooks[0].id; State.settings.activeNotebookId = State.activeNotebookId; await DB.put('settings', State.settings); } render(); showToast('单词本已删除');
+    }
+    function exportData() {
+      const payload = { exportedAt: new Date().toISOString(), notebooks: State.notebooks, words: State.words, settings: State.settings, dailyLog: State.logs }; const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = 'xixi-word-backup-' + todayKey() + '.json'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); showToast('备份文件已下载');
+    }
+    async function importData(mode) {
+      const payload = State.importPayload; if (!payload) return;
+      if (mode === 'overwrite') {
+        await DB.clear('words'); await DB.clear('dailyLog'); await DB.clear('notebooks');
+        if (Array.isArray(payload.notebooks)) await DB.bulkPut('notebooks', payload.notebooks.map((book, index) => ({ ...book, sortOrder: book.sortOrder ?? index })));
+        await DB.bulkPut('words', payload.words || []); await DB.bulkPut('dailyLog', payload.dailyLog || []); if (payload.settings) await DB.put('settings', { ...DEFAULT_SETTINGS, ...payload.settings });
+      } else {
+        let books = await DB.all('notebooks'); const byName = new Map(books.map(book => [String(book.name).toLowerCase(), book])); const bookMap = new Map();
+        for (const incoming of (payload.notebooks || [])) { let book = byName.get(String(incoming.name || '').toLowerCase()); if (!book) book = await DB.put('notebooks', { ...incoming, id: undefined, sortOrder: books.length, createdAt: incoming.createdAt || Date.now() }); bookMap.set(incoming.id, book.id); byName.set(String(book.name).toLowerCase(), book); books = [...books, book]; }
+        const fallback = State.activeNotebookId || books[0]?.id; const currentByWord = new Map(State.words.map(word => [word.word.toLowerCase(), word]));
+        for (const incoming of payload.words || []) { const existing = currentByWord.get(String(incoming.word || '').toLowerCase()); if (existing && mode === 'skip') continue; const notebookId = bookMap.get(incoming.notebookId) || existing?.notebookId || fallback; await DB.put('words', existing ? { ...existing, ...incoming, id: existing.id, notebookId } : { ...incoming, id: undefined, notebookId }); }
+        if (payload.settings && mode === 'merge') await DB.put('settings', { ...State.settings, ...payload.settings, key: 'config' });
+        for (const incoming of payload.dailyLog || []) { const notebookId = bookMap.get(incoming.notebookId) || fallback; const existing = State.logs.find(log => log.date === incoming.date && Number(log.notebookId || fallback) === Number(notebookId)); await DB.put('dailyLog', existing ? { ...existing, ...incoming, id: existing.id, notebookId } : { ...incoming, id: undefined, notebookId }); }
+      }
+      State.words = await DB.all('words'); State.logs = await DB.all('dailyLog'); State.notebooks = await DB.all('notebooks'); const saved = await DB.get('settings', 'config'); State.settings = { ...DEFAULT_SETTINGS, ...(saved || {}) }; await ensureNotebooks(); State.importPayload = null; await ensureDailyLog(); showToast('数据恢复完成'); render();
+    }
+    /* 单词本相关输入和按钮放在捕获阶段，优先于旧版通用事件。 */
+    document.addEventListener('change', async (event) => {
+      const input = event.target;
+      if (input.dataset.input === 'active-notebook') { event.stopPropagation(); await switchActiveNotebook(input.value); return; }
+      if (input.dataset.input === 'form-notebook') { State.batchNotebookId = Number(input.value); return; }
+      if (input.dataset.input === 'move-word') { event.stopPropagation(); await moveWordToNotebook(input.dataset.id, input.value); return; }
+    }, true);
+    document.addEventListener('click', async (event) => {
+      const target = event.target.closest('[data-action]'); if (!target) return; const action = target.dataset.action;
+      if (action === 'rename-notebook') { event.preventDefault(); event.stopPropagation(); await renameNotebook(target.dataset.id); }
+      if (action === 'delete-notebook') { event.preventDefault(); event.stopPropagation(); await deleteNotebook(target.dataset.id); }
+    }, true);
+    document.addEventListener('submit', async (event) => {
+      if (event.target.id !== 'notebookForm') return; event.preventDefault(); event.stopPropagation(); await createNotebook(event.target);
+    }, true);
+
+    /** 新词保存时写入当前单词本；单词本切换不会改变网址。 */
+    async function saveWordForm(form) {
+      const data = Object.fromEntries(new FormData(form).entries()); const existing = data.id ? State.words.find(word => word.id === Number(data.id)) : null; const suppliedEmoji = String(data.emoji || '').trim(); const bookId = Number(data.notebookId || State.activeNotebookId);
+      const imageUrl = State.wordImageDraft !== null ? State.wordImageDraft : String(data.imageUrl || '').trim(); const imageSource = State.wordImageSource !== null ? State.wordImageSource : String(existing?.imageSource || '').trim(); const imageTitle = State.wordImageTitle || String(existing?.imageTitle || '').trim();
+      const next = { ...(existing || { status: 'new', reviewCount: 0, lastReview: 0, nextReview: 0, errorCount: 0, createdAt: Date.now() }), word: String(data.word || '').trim(), notebookId: bookId, phonetic: String(data.phonetic || '').trim(), meaning: String(data.meaning || '').trim(), exampleEn: String(data.exampleEn || '').trim(), exampleCn: String(data.exampleCn || '').trim(), imageUrl, imageSource, imageTitle, emoji: suppliedEmoji, hint: String(data.hint || '').trim() };
+      if (!next.word) { showToast('请先填写英文单词或词组'); return; }
+      const duplicate = State.words.find(word => word.word.toLowerCase() === next.word.toLowerCase() && word.id !== next.id); if (duplicate) { showToast('词库里已经有这个单词啦'); return; }
+      if (!next.meaning || !next.exampleEn || !next.exampleCn || !next.phonetic) { showToast('正在自动补全释义、音标和中英文例句…'); await lookupWordOnline(next); }
+      if (!next.meaning) { showToast('暂时没有查到中文释义，请检查单词拼写'); return; } ensureBilingualExample(next); if (!suppliedEmoji) next.emoji = getEmoji(next.meaning);
+      await DB.put('words', next); State.words = await DB.all('words'); State.editingWordId = null; State.wordImageDraft = null; State.wordImageSource = null; State.wordImageTitle = ''; State.imageStatus = ''; await ensureDailyLog(); showToast(existing ? '单词已更新' : '单词已加入“' + notebookName(bookId) + '”'); render();
+    }
+    async function saveBatch() {
+      const items = State.batchPreview; const bookId = Number(State.batchNotebookId || State.activeNotebookId); const existingWords = new Set(State.words.map(word => word.word.toLowerCase()));
+      if (items.some(item => !item.meaning || !item.phonetic || !item.exampleEn || !item.exampleCn)) { showToast('正在准备每个词的释义、音标和中英文例句…'); await mapOnlineWithConcurrency(items, async item => { await lookupWordOnline(item); ensureBilingualExample(item); }, 6); }
+      const incomplete = items.filter(item => !String(item.meaning || '').trim()); if (incomplete.length) { showToast(incomplete.length + ' 个词没有查到中文释义，暂不录入。'); render(); return; }
+      let added = 0; for (const item of items) { ensureBilingualExample(item); if (!item.emoji) item.emoji = getEmoji(item.meaning); if (existingWords.has(item.word.toLowerCase())) continue; await DB.put('words', { ...item, notebookId: bookId, status: 'new', reviewCount: 0, lastReview: 0, nextReview: 0, errorCount: 0, createdAt: Date.now() + added }); added++; }
+      State.words = await DB.all('words'); State.batchPreview = []; State.batchText = ''; await ensureDailyLog(); showToast(added ? '已录入 ' + added + ' 个单词到“' + notebookName(bookId) + '”' : '重复单词已跳过'); render();
+    }
+    async function saveBatchInput() { if (!State.batchPreview.length) { showToast('请先解析单词'); return; } if (State.batchPreview.some(item => !item.meaning.trim())) await lookupBatchOnline(); const incomplete = State.batchPreview.filter(item => !item.meaning.trim()); if (incomplete.length) { showToast(incomplete.length + ' 个词暂时没有中文释义，请联网补全或手动填写'); return; } await saveBatch(); }
+    /* 解析后固定这批词的归属，避免用户切换单词本时误放位置。 */
+    document.addEventListener('click', (event) => {
+      const target = event.target.closest('[data-action="parse-batch"]'); if (!target) return; State.batchNotebookId = Number(State.activeNotebookId);
+    }, true);
     init();
   </script>
 </body>
