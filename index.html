@@ -312,6 +312,19 @@
     const EMOJI_MAP = {
       '住':'🏨','房':'🏠','家':'🏡','店':'🏪','宿':'🛏️','吃':'🍽️','食':'🍎','喝':'🥤','餐':'🍽️','饿':'😋','学':'📚','校':'🏫','书':'📖','读':'📖','教':'👨‍🏫','车':'🚗','路':'🛣️','走':'🚶','跑':'🏃','飞':'✈️','说':'💬','话':'🗣️','聊':'💭','讲':'🎤','喊':'📢','钱':'💰','买':'🛒','卖':'🏷️','付':'💳','贵':'💎','乐':'🎉','庆':'🎊','喜':'😊','笑':'😄','哭':'😢','工':'💼','作':'📝','业':'📋','职':'💼','忙':'⏰','医':'🏥','病':'🤒','药':'💊','痛':'😣','健':'💪','旅':'✈️','游':'🏖️','行':'🧳','景':'🏞️','玩':'🎮','爱':'❤️','情':'💕','友':'👫','亲':'👨‍👩‍👧','冷':'❄️','热':'☀️','雨':'🌧️','雪':'❄️','风':'💨','大':'⬆️','小':'⬇️','高':'📈','低':'📉','新':'✨','老':'👴','好':'👍','坏':'👎','美':'💄','丑':'🤡','快':'⚡','慢':'🐢','早':'🌅','晚':'🌙','default':'📌'
     };
+    /* 常见 PET 词汇的语义图标。Emoji 是稳定的本地兜底，不依赖外部图片服务。 */
+    const WORD_EMOJI_MAP = {
+      accommodation:'🏨', advertisement:'📺', celebrate:'🎉', celebration:'🎊', birthday:'🎂', christmas:'🎄', festival:'🎉',
+      'weather forecast':'🌦️', weather:'🌤️', thunder:'⛈️', thunderstorm:'⛈️', lightning:'⚡', shower:'🚿', freezing:'🥶', frosty:'❄️', foggy:'🌫️',
+      transport:'🚌', 'public transport':'🚌', traffic:'🚦', journey:'🧳', travel:'✈️', airport:'🛫', bicycle:'🚲', train:'🚆', station:'🚉',
+      food:'🍽️', restaurant:'🍴', breakfast:'🥣', lunch:'🍱', dinner:'🍽️', hungry:'😋', thirsty:'🥤',
+      school:'🏫', student:'🧑‍🎓', teacher:'👨‍🏫', library:'📚', book:'📖', homework:'📝', exam:'📝',
+      hospital:'🏥', doctor:'🧑‍⚕️', medicine:'💊', healthy:'💪', exercise:'🏃', sport:'⚽',
+      money:'💰', price:'🏷️', shopping:'🛒', market:'🛍️', phone:'📱', computer:'💻', television:'📺', music:'🎵', movie:'🎬',
+      house:'🏠', home:'🏡', hotel:'🏨', room:'🛏️', family:'👨‍👩‍👧', friend:'👫', love:'❤️', happy:'😊', sad:'😢', angry:'😠',
+      big:'⬆️', small:'⬇️', fast:'⚡', slow:'🐢', morning:'🌅', evening:'🌆', night:'🌙', sun:'☀️', rain:'🌧️', snow:'❄️', wind:'💨',
+      variety:'🎨', different:'🎨', important:'⭐', difficult:'🧩', easy:'👍', idea:'💡', question:'❓', answer:'✅'
+    };
     const $ = (selector, root = document) => root.querySelector(selector);
     const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
     const pad = (n) => String(n).padStart(2, '0');
@@ -319,7 +332,22 @@
     const dateStart = (key = todayKey()) => new Date(`${key}T00:00:00`).getTime();
     const tomorrowStart = () => dateStart() + 86400000;
     const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char]));
-    const getEmoji = (meaning = '') => { for (const char of meaning.slice(0, 3)) if (EMOJI_MAP[char]) return EMOJI_MAP[char]; return EMOJI_MAP.default; };
+    const MEANING_EMOJI_HINTS = [
+      ['公共交通','🚌'],['交通','🚌'],['广告','📺'],['庆祝','🎉'],['节日','🎊'],['天气预报','🌦️'],['天气','🌤️'],
+      ['雷暴','⛈️'],['雷雨','⛈️'],['雷声','⛈️'],['雷','⛈️'],['闪电','⚡'],['阵雨','🌧️'],['淋浴','🚿'],
+      ['冰冻','🥶'],['极冷','🥶'],['霜','❄️'],['雾','🌫️'],['住处','🏨'],['住宿','🏨'],['旅程','🧳'],
+      ['学校','🏫'],['书','📖'],['医院','🏥'],['食物','🍽️'],['餐厅','🍴'],['钱','💰'],['购物','🛒'],['家庭','👨‍👩‍👧']
+    ];
+    const getEmoji = (meaning = '', term = '') => {
+      const termText = String(term || '').toLowerCase().replace(/\s+/g, ' ').trim();
+      const meaningText = String(meaning || '').toLowerCase().trim();
+      const direct = Object.keys(WORD_EMOJI_MAP).find(key => termText === key || termText.includes(key));
+      if (direct) return WORD_EMOJI_MAP[direct];
+      const meaningHint = MEANING_EMOJI_HINTS.find(([key]) => meaningText.includes(key));
+      if (meaningHint) return meaningHint[1];
+      for (const char of String(meaning || '').slice(0, 4)) if (EMOJI_MAP[char]) return EMOJI_MAP[char];
+      return EMOJI_MAP.default;
+    };
     const statusLabel = { new: '未学习', learning: '学习中', mastered: '已掌握', struggling: '需要再练' };
     const statusClass = { new: '', learning: 'blue', mastered: 'green', struggling: 'orange' };
     const normalizeWord = (value = '') => value.trim().toLowerCase().replace(/[^a-z']/g, '');
@@ -386,6 +414,7 @@
     /** 读取本地数据，并在首次启动时写入示例词。 */
     async function hydrate() {
       State.words = await DB.all('words');
+      State.words = await cleanStoredWordData(State.words);
       /* 先记录启动前是否已有旧词；这样首次自动写入的示例词会直接进入 PET核心单词。 */
       State.legacyWordsPresent = State.words.length > 0;
       if (!State.words.length) {
@@ -471,7 +500,8 @@
       return { log, newWords: log.plannedNew.map(id => State.words.find(word => word.id === id)).filter(Boolean), reviewWords: log.plannedReview.map(id => State.words.find(word => word.id === id)).filter(Boolean) };
     }
     function currentLog() { return State.logs.find(item => item.date === State.today); }
-    function wordVisual(word, className = '') { return word.imageUrl ? `<div class="${className || 'word-emoji'}"><img src="${escapeHtml(word.imageUrl)}" alt="${escapeHtml(word.word)}" loading="lazy" onerror="this.closest('div').classList.add('image-failed');this.remove()"></div>` : `<div class="${className || 'word-emoji'}">${escapeHtml(word.emoji || getEmoji(word.meaning))}</div>`; }
+    function handleImageError(image) { const box = image?.closest('div'); if (!box) return; box.classList.add('image-failed'); image.remove(); box.insertAdjacentText('beforeend', image.dataset.fallback || '🖼️'); }
+    function wordVisual(word, className = '') { const fallback = word.emoji || getEmoji(word.meaning, word.word); return word.imageUrl ? `<div class="${className || 'word-emoji'}"><img src="${escapeHtml(word.imageUrl)}" data-fallback="${escapeHtml(fallback)}" alt="${escapeHtml(word.word)}" loading="lazy" onerror="handleImageError(this)"></div>` : `<div class="${className || 'word-emoji'}">${escapeHtml(fallback)}</div>`; }
     /** 返回当前表单中的图片草稿；本地图片会压缩成 data URL，能在 iPad 离线学习。 */
     function imageDraftFor(edit) { return State.wordImageDraft !== null ? State.wordImageDraft : (edit?.imageUrl || ''); }
     /** 将相机或相册图片缩小后保存，避免原图过大导致本机词库超出存储空间。 */
@@ -503,7 +533,7 @@
     /** 从 Wikimedia Commons 查找一张可公开访问的图片；用户点击后才联网查询。 */
     async function findWikimediaImage(query) {
       const params = new URLSearchParams({ action:'query', format:'json', origin:'*', generator:'search', gsrsearch:query, gsrnamespace:'6', gsrlimit:'1', prop:'imageinfo', iiprop:'url|mime', iiurlwidth:'640' });
-      const response = await fetch(`${WIKIMEDIA_IMAGE_API}?${params.toString()}`); if (!response.ok) throw new Error('图片搜索失败');
+      const response = await fetchWithTimeout(`${WIKIMEDIA_IMAGE_API}?${params.toString()}`, {}, 4500); if (!response.ok) throw new Error('图片搜索失败');
       const payload = await response.json(); const page = Object.values(payload?.query?.pages || {})[0]; const info = page?.imageinfo?.[0];
       if (!info?.thumburl || !String(info.mime || '').startsWith('image/')) return null;
       return { imageUrl: info.thumburl, imageSource: info.descriptionurl || info.url || '', imageTitle: page.title || '' };
@@ -642,17 +672,20 @@
       renderLearning();
     }
     function currentWord() { return State.words.find(word => word.id === State.currentTask?.wordId); }
-    function renderLearning() { if (!State.currentTask) return; const word = currentWord(); const app = $('#app'); if (!word) { State.currentTask = null; Router.navigate('/learn'); return; } let html = ''; if (State.currentTask.stage === 'A') html = renderStageA(word); if (State.currentTask.stage === 'R') html = renderReviewSelf(word); if (State.currentTask.stage === 'B') html = renderStageB(word); if (State.currentTask.stage === 'C') html = renderStageC(word); app.innerHTML = `<section class="screen learn-wrap"><div class="learn-top exit-row"><button class="btn btn-ghost" data-action="exit-learning">← 退出</button><span class="step-label">${State.currentTask.type === 'review' ? '今日复习' : '今日新词'} · ${stageName(State.currentTask.stage)}</span><span class="badge blue">${taskProgressText()}</span></div><div class="learning-card">${html}</div><div></div></section>`; bindLearningTimers(); }
-    function stageName(stage) { return ({ A:'第 1 步 · 认识', R:'复习自评', B:'第 2 步 · 选择', C:'第 3 步 · 拼写' })[stage] || ''; }
+    function renderLearning() { if (!State.currentTask) return; const word = currentWord(); const app = $('#app'); if (!word) { State.currentTask = null; Router.navigate('/learn'); return; } let html = ''; if (State.currentTask.stage === 'A') html = renderStageA(word); if (State.currentTask.stage === 'R') html = renderReviewSelf(word); if (State.currentTask.stage === 'R-card') html = renderReviewReveal(word); if (State.currentTask.stage === 'B') html = renderStageB(word); if (State.currentTask.stage === 'C') html = renderStageC(word); app.innerHTML = `<section class="screen learn-wrap"><div class="learn-top exit-row"><button class="btn btn-ghost" data-action="exit-learning">← 退出</button><span class="step-label">${State.currentTask.type === 'review' ? '今日复习' : '今日新词'} · ${stageName(State.currentTask.stage)}</span><span class="badge blue">${taskProgressText()}</span></div><div class="learning-card">${html}</div><div></div></section>`; bindLearningTimers(); }
+    function stageName(stage) { return ({ A:'第 1 步 · 认识', R:'复习自评', 'R-card':'完整单词卡', B:'第 2 步 · 选择', C:'第 3 步 · 拼写' })[stage] || ''; }
     function taskProgressText() { const log = currentLog() || {}; const ids = State.currentTask?.type === 'review' ? (log.plannedReview || []) : (log.plannedNew || []); const done = State.currentTask?.type === 'review' ? (log.wordsReviewed || []) : (log.wordsStudied || []); const index = Math.max(0, ids.indexOf(State.currentTask?.wordId)); return `${Math.min(index + 1, ids.length)} / ${ids.length}`; }
-    function visualBlock(word, className = 'visual-word') { return word.imageUrl ? `<div class="${className}"><img src="${escapeHtml(word.imageUrl)}" alt="${escapeHtml(word.word)}"></div>` : `<div class="${className}">${escapeHtml(word.emoji || getEmoji(word.meaning))}</div>`; }
+    function visualBlock(word, className = 'visual-word') { const fallback = word.emoji || getEmoji(word.meaning, word.word); return word.imageUrl ? `<div class="${className}"><img src="${escapeHtml(word.imageUrl)}" data-fallback="${escapeHtml(fallback)}" alt="${escapeHtml(word.word)}" onerror="handleImageError(this)"></div>` : `<div class="${className}">${escapeHtml(fallback)}</div>`; }
     function renderStageA(word) { const ready = Date.now() >= State.stageAReadyAt; return `<article class="flip-card ${State.stageAFlipped ? 'flipped' : ''}"><div class="flip-face flip-front">${visualBlock(word)}<div class="word-big">${escapeHtml(word.word)}</div><div class="phonetic">${escapeHtml(word.phonetic || '')}</div><button class="btn speak-btn" data-action="speak-current">🔊 听发音</button><div class="flip-action">${ready ? '<span>准备好后翻开卡片</span>' : `<span class="countdown" data-countdown>${COGNITION_SECONDS}秒后可翻转</span>`}<button class="btn ${ready ? 'btn-primary' : 'btn-secondary'} btn-block" style="margin-top:10px" data-action="flip-card" ${ready ? '' : 'disabled'}>↩️ 翻转卡片</button></div></div><div class="flip-face flip-back"><div class="eyebrow">认识这个词</div><div class="meaning-large">${escapeHtml(word.meaning)}</div><div class="example-en">${highlightWord(word.exampleEn, word.word)}</div><div class="example-cn">${escapeHtml(word.exampleCn || '')}</div>${word.hint ? `<div class="hint-box">💡 <strong>记忆小提示</strong><br>${escapeHtml(word.hint)}</div>` : ''}<div class="choice-self"><button class="btn btn-success" data-action="self-known">我认识 😊</button><button class="btn btn-warning" data-action="self-unknown">不认识 🤔</button></div></div></article>`; }
     function highlightWord(sentence = '', word = '') { const safe = escapeHtml(sentence); const escapedWord = escapeHtml(word); return safe.replace(new RegExp(`(${escapedWord})`, 'ig'), '<mark>$1</mark>'); }
     function bindLearningTimers() { if (State.currentTask?.stage === 'A' && !State.stageAFlipped && Date.now() < State.stageAReadyAt) { const tick = () => { if (State.currentTask?.stage !== 'A' || State.stageAFlipped) return; const target = $('[data-countdown]'); if (!target) return; const left = Math.max(0, Math.ceil((State.stageAReadyAt - Date.now()) / 1000)); target.textContent = left ? `${left}秒后可翻转` : '可以翻转啦'; if (left) setTimeout(tick, 250); else renderLearning(); }; tick(); } if (State.currentTask?.stage === 'C' && State.spell?.mode === 'keyboard') setTimeout(() => $('.spell-input')?.focus(), 60); }
     function renderReviewSelf(word) { return `<article class="card review-card"><div class="eyebrow">复习一下</div>${visualBlock(word)}<div class="word-big">${escapeHtml(word.word)}</div><div class="phonetic">${escapeHtml(word.phonetic || '')}</div><div class="muted small" style="margin-top:9px">先想一想它是什么意思</div><div class="self-grid"><button class="btn btn-success" data-action="review-self" data-known="true">记得 😊</button><button class="btn btn-warning" data-action="review-self" data-known="false">不太记得 🤔</button></div><button class="btn btn-ghost" style="margin-top:10px" data-action="speak-current">🔊 听一遍</button></article>`; }
-    function makeQuiz(word) { const otherMeanings = State.words.filter(item => item.id !== word.id && item.meaning).map(item => item.meaning); const fallback = ['广告', '挑战', '贡献', '庆祝', '住处，住宿', '机会', '环境', '决定']; const choices = unique([word.meaning, ...shuffle([...otherMeanings, ...fallback])]).slice(0, 4); return shuffle(choices); }
+    /** 复习自评“不太记得”后先展示完整卡片，再进入拼写，不让孩子直接跳到空白测试。 */
+    function renderReviewReveal(word) { return `<article class="card review-card review-reveal"><div class="eyebrow">完整单词卡</div>${visualBlock(word)}<div class="word-big">${escapeHtml(word.word)}</div><div class="phonetic">${escapeHtml(word.phonetic || '音标待补充')}</div><div class="meaning-large">${escapeHtml(word.meaning || '中文释义待补充')}</div>${word.exampleEn ? `<div class="example-en">${highlightWord(word.exampleEn, word.word)}</div>` : '<div class="muted">暂无英文例句</div>'}${word.exampleCn ? `<div class="example-cn">${escapeHtml(word.exampleCn)}</div>` : ''}${word.hint ? `<div class="hint-box">💡 <strong>记忆小提示</strong><br>${escapeHtml(word.hint)}</div>` : ''}<button class="btn btn-primary btn-block" style="margin-top:18px" data-action="review-card-continue">看完了，开始拼写 →</button><button class="btn btn-ghost btn-block" style="margin-top:7px" data-action="speak-current">🔊 听一遍</button></article>`; }
+    function quizMeaning(word) { const curated = referenceDataFor(word?.word); return looksLikeBadMeaning(word?.meaning) && curated?.meaning ? curated.meaning : String(word?.meaning || ''); }
+    function makeQuiz(word) { const answer = quizMeaning(word); const otherMeanings = State.words.filter(item => item.id !== word.id && !looksLikeBadMeaning(item.meaning)).map(item => item.meaning); const fallback = ['广告', '挑战', '贡献', '庆祝', '住处，住宿', '机会', '环境', '决定']; const choices = unique([answer, ...shuffle([...otherMeanings, ...fallback])].filter(Boolean)).slice(0, 4); return shuffle(choices); }
     function shuffle(list) { return list.sort(() => Math.random() - .5); }
-    function renderStageB(word) { if (!State.stageB) State.stageB = { choices: makeQuiz(word), selected: null, correct: null }; const quiz = State.stageB; return `<article class="card quiz-card"><div class="eyebrow">选一选</div><h2 style="margin-top:8px">这个单词是什么意思？</h2><div class="quiz-visual">${visualBlock(word, 'visual-word')}<div class="quiz-word">${escapeHtml(word.word)}</div></div><div class="quiz-options">${quiz.choices.map((choice, index) => { const isCorrect = choice === word.meaning; const cls = quiz.correct === true && isCorrect ? 'correct' : quiz.correct === false && isCorrect ? 'correct' : quiz.selected === choice && quiz.correct === false ? 'wrong' : ''; return `<button class="quiz-option ${cls}" data-action="quiz-answer" data-choice="${escapeHtml(choice)}" ${quiz.correct === true || quiz.correct === false ? 'disabled' : ''}><span class="option-letter">${String.fromCharCode(65 + index)}</span><span>${escapeHtml(choice)}</span>${cls === 'correct' ? '<span style="margin-left:auto">✓</span>' : ''}</button>`; }).join('')}</div><div class="quiz-feedback ${quiz.correct === true ? 'feedback-good' : quiz.correct === false ? 'feedback-bad' : ''}">${quiz.correct === true ? '对了！🎉 进入拼写挑战…' : quiz.correct === false ? '再想想 💡 看看绿色答案，然后继续。' : '选出你认为正确的中文释义'}</div>${quiz.correct === false ? '<button class="btn btn-primary btn-block" style="margin-top:12px" data-action="quiz-continue">继续拼写 →</button>' : ''}</article>`; }
+    function renderStageB(word) { const answer = quizMeaning(word); if (!State.stageB) State.stageB = { choices: makeQuiz(word), selected: null, correct: null }; const quiz = State.stageB; return `<article class="card quiz-card"><div class="eyebrow">选一选</div><h2 style="margin-top:8px">这个单词是什么意思？</h2><div class="quiz-visual">${visualBlock(word, 'visual-word')}<div class="quiz-word">${escapeHtml(word.word)}</div></div><div class="quiz-options">${quiz.choices.map((choice, index) => { const isCorrect = choice === answer; const cls = quiz.correct === true && isCorrect ? 'correct' : quiz.correct === false && isCorrect ? 'correct' : quiz.selected === choice && quiz.correct === false ? 'wrong' : ''; return `<button class="quiz-option ${cls}" data-action="quiz-answer" data-choice="${escapeHtml(choice)}" ${quiz.correct === true || quiz.correct === false ? 'disabled' : ''}><span class="option-letter">${String.fromCharCode(65 + index)}</span><span>${escapeHtml(choice)}</span>${cls === 'correct' ? '<span style="margin-left:auto">✓</span>' : ''}</button>`; }).join('')}</div><div class="quiz-feedback ${quiz.correct === true ? 'feedback-good' : quiz.correct === false ? 'feedback-bad' : ''}">${quiz.correct === true ? '对了！🎉 进入拼写挑战…' : quiz.correct === false ? '再想想 💡 看看绿色答案，然后继续。' : '选出你认为正确的中文释义'}</div>${quiz.correct === false ? '<button class="btn btn-primary btn-block" style="margin-top:12px" data-action="quiz-continue">继续拼写 →</button>' : ''}</article>`; }
     function renderStageC(word) { const spell = State.spell || (State.spell = { mode: State.currentTask.mode || 'keyboard', value: '', tiles: shuffle(word.word.toLowerCase().split('').map((letter, index) => ({ letter, key: `${index}-${Math.random()}`, used: false }))), error: false, success: false, compare: '' }); if (spell.success) return `<article class="card spell-card spell-success"><div class="success-icon">🌟</div><h2>拼写正确！</h2><p class="muted">${escapeHtml(word.word)} 已经记住啦</p><button class="btn btn-success btn-block" style="margin-top:28px" data-action="next-word">继续下一个 →</button></article>`; return `<article class="card spell-card"><div class="eyebrow">最后一关</div><h2 style="margin-top:8px;text-align:center">请拼写这个单词</h2><div class="spell-prompt"><div class="meaning-large">${escapeHtml(word.meaning)}</div>${word.exampleEn ? `<div class="spell-example">${highlightBlank(word.exampleEn, word.word)}</div>` : ''}<div class="phonetic" style="margin-top:12px">${escapeHtml(word.phonetic || '')}</div></div><div class="mode-toggle"><button class="mode-btn ${spell.mode === 'keyboard' ? 'active' : ''}" data-action="spell-mode" data-mode="keyboard">⌨️ 键盘输入</button><button class="mode-btn ${spell.mode === 'drag' ? 'active' : ''}" data-action="spell-mode" data-mode="drag">🔤 拖拽字母</button></div>${spell.mode === 'keyboard' ? `<input class="input spell-input ${spell.error ? 'error' : ''}" data-input="spell-value" value="${escapeHtml(spell.value)}" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="输入英文单词" aria-label="拼写答案">` : `<div class="drag-slots">${word.word.split('').map((_, i) => `<span class="slot ${spell.value[i] ? 'filled' : ''}">${escapeHtml(spell.value[i] || '')}</span>`).join('')}</div><div class="letter-bank">${spell.tiles.map(tile => `<button class="letter-tile ${tile.used ? 'used' : ''}" data-action="pick-letter" data-key="${escapeHtml(tile.key)}" ${tile.used ? 'disabled' : ''}>${escapeHtml(tile.letter)}</button>`).join('')}</div>`}<div class="spell-actions"><button class="btn btn-secondary" data-action="spell-hint" ${State.currentTask.hintCount >= 3 ? 'disabled' : ''}>💡 提示 ${State.currentTask.hintCount ? `(${State.currentTask.hintCount}/3)` : ''}</button><button class="btn btn-primary" data-action="check-spell">检查答案</button></div>${spell.error ? `<div class="compare">${compareSpelling(spell.value, word.word)}</div><div class="feedback-bad" style="text-align:center;margin-top:11px;font-weight:800">再试一次 💪 ${State.currentTask.spellAttempts >= 3 ? '这个单词有点难，我们明天再练。' : ''}</div>` : '<div class="muted tiny" style="text-align:center;margin-top:14px">拼写正确才能过关，可以无限次尝试</div>'}</article>`; }
     function highlightBlank(sentence = '', word = '') { return escapeHtml(sentence).replace(new RegExp(`_{2,}|${escapeHtml(word)}`, 'ig'), '____'); }
     function compareSpelling(answer, correct) { const raw = String(answer || ''); const a = raw.toLowerCase(); const letters = correct.split('').map((letter, i) => a[i] === letter ? `<span class="letter-right">${escapeHtml(letter)}</span>` : `<span class="letter-wrong">${escapeHtml(a[i] || '·')}</span>`).join(''); return `<div class="compare-label">你的输入：<strong>${escapeHtml(raw || '（未输入）')}</strong><br>正确拼写：<strong>${escapeHtml(correct)}</strong></div><div>${letters}</div>`; }
@@ -693,7 +726,8 @@
         current.meaning = current.meaning.trim();
         current.exampleEn = current.exampleEn.trim();
         current.exampleCn = current.exampleCn.trim();
-        current.emoji = current.emoji || getEmoji(current.meaning);
+        /* 只有确实有中文释义时才匹配 Emoji；不能在解析阶段先写入 📌，否则在线补全后不会更新。 */
+        current.emoji = current.emoji || (current.meaning ? getEmoji(current.meaning, current.word) : '');
         records.push(current);
         current = null;
       };
@@ -799,7 +833,7 @@
       const progress = `${test.index + 1} / ${test.ids.length}`;
       if (test.stage === 'meaning') {
         if (!test.choices) test.choices = makeQuiz(word);
-        return `<section class="screen"><div class="learn-top exit-row"><button class="btn btn-ghost" data-action="exit-weekly-test">← 退出</button><span class="step-label">周五检测 · 意思</span><span class="badge orange">${progress}</span></div><article class="card quiz-card"><div class="eyebrow">第一项：知道意思</div><h2 style="margin-top:8px">${escapeHtml(word.word)} 是什么意思？</h2><div class="quiz-visual">${visualBlock(word, 'visual-word')}<div class="quiz-word">${escapeHtml(word.word)}</div></div><div class="quiz-options">${test.choices.map((choice, index) => { const isCorrect = choice === word.meaning; const cls = test.correct !== null && isCorrect ? 'correct' : test.selected === choice && test.correct === false ? 'wrong' : ''; return `<button class="quiz-option ${cls}" data-action="weekly-meaning-answer" data-choice="${escapeHtml(choice)}" ${test.correct !== null ? 'disabled' : ''}><span class="option-letter">${String.fromCharCode(65 + index)}</span><span>${escapeHtml(choice)}</span>${isCorrect && test.correct !== null ? '<span style="margin-left:auto">✓</span>' : ''}</button>`; }).join('')}</div><div class="quiz-feedback ${test.correct === true ? 'feedback-good' : test.correct === false ? 'feedback-bad' : ''}">${test.correct === true ? '回答正确！进入拼写检测。' : test.correct === false ? `正确答案是“${escapeHtml(word.meaning)}”，记住它，再进入拼写。` : '请选择一个答案'}</div>${test.correct !== null ? '<button class="btn btn-primary btn-block" style="margin-top:12px" data-action="weekly-meaning-continue">进入拼写 →</button>' : ''}</article></section>`;
+        return `<section class="screen"><div class="learn-top exit-row"><button class="btn btn-ghost" data-action="exit-weekly-test">← 退出</button><span class="step-label">周五检测 · 意思</span><span class="badge orange">${progress}</span></div><article class="card quiz-card"><div class="eyebrow">第一项：知道意思</div><h2 style="margin-top:8px">${escapeHtml(word.word)} 是什么意思？</h2><div class="quiz-visual">${visualBlock(word, 'visual-word')}<div class="quiz-word">${escapeHtml(word.word)}</div></div><div class="quiz-options">${test.choices.map((choice, index) => { const isCorrect = choice === quizMeaning(word); const cls = test.correct !== null && isCorrect ? 'correct' : test.selected === choice && test.correct === false ? 'wrong' : ''; return `<button class="quiz-option ${cls}" data-action="weekly-meaning-answer" data-choice="${escapeHtml(choice)}" ${test.correct !== null ? 'disabled' : ''}><span class="option-letter">${String.fromCharCode(65 + index)}</span><span>${escapeHtml(choice)}</span>${isCorrect && test.correct !== null ? '<span style="margin-left:auto">✓</span>' : ''}</button>`; }).join('')}</div><div class="quiz-feedback ${test.correct === true ? 'feedback-good' : test.correct === false ? 'feedback-bad' : ''}">${test.correct === true ? '回答正确！进入拼写检测。' : test.correct === false ? `正确答案是“${escapeHtml(quizMeaning(word))}”，记住它，再进入拼写。` : '请选择一个答案'}</div>${test.correct !== null ? '<button class="btn btn-primary btn-block" style="margin-top:12px" data-action="weekly-meaning-continue">进入拼写 →</button>' : ''}</article></section>`;
       }
       return `<section class="screen"><div class="learn-top exit-row"><button class="btn btn-ghost" data-action="exit-weekly-test">← 退出</button><span class="step-label">周五检测 · 拼写</span><span class="badge orange">${progress}</span></div><article class="card spell-card"><div class="eyebrow">第二项：完成拼写</div><h2 style="margin-top:8px;text-align:center">请拼写这个单词</h2><div class="spell-prompt"><div class="meaning-large">${escapeHtml(word.meaning)}</div>${word.exampleEn ? `<div class="spell-example">${highlightBlank(word.exampleEn, word.word)}</div>` : ''}<div class="phonetic" style="margin-top:12px">${escapeHtml(word.phonetic || '')}</div></div>${test.spellCorrect ? '<div class="success-icon" style="font-size:55px">✅</div><h3 style="text-align:center;color:var(--success);margin-top:8px">拼写正确</h3><button class="btn btn-success btn-block" style="margin-top:20px" data-action="weekly-next-word">下一个 →</button>' : `<input class="input spell-input ${test.spellError ? 'error' : ''}" data-input="weekly-spell" value="${escapeHtml(test.spellValue)}" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="输入英文单词" aria-label="周测拼写答案"><button class="btn btn-primary btn-block" style="margin-top:14px" data-action="weekly-check-spell">检查拼写</button>${test.spellError ? `<div class="compare">${compareSpelling(test.spellValue, word.word)}</div><div class="feedback-bad" style="text-align:center;margin-top:11px;font-weight:800">还差一点，再试一次。</div>` : '<div class="muted tiny" style="text-align:center;margin-top:13px">必须拼写正确才能通过这个词。</div>'}`}</article></section>`;
     }
@@ -846,12 +880,22 @@
     const WIKIMEDIA_IMAGE_API = 'https://commons.wikimedia.org/w/api.php';
     const ONLINE_CACHE_KEY = 'PETOnlineLookupCacheV2';
     const CAMBRIDGE_REFERENCE = 'https://dictionary.cambridge.org/dictionary/english/';
+    const PET_WORDLIST_URL = 'https://www.cambridgeenglish.org/Images/506887-b1-preliminary-vocabulary-list.pdf';
     // OCR.Space 的公开测试额度只适合个人试用；正式长期使用建议换成自己的服务端代理。
     const OCR_TEST_KEY = 'helloworld';
 
     function readOnlineCache() { try { return JSON.parse(localStorage.getItem(ONLINE_CACHE_KEY) || '{"translations":{},"dictionary":{}}'); } catch (_) { return { translations: {}, dictionary: {} }; } }
     function writeOnlineCache(cache) { try { localStorage.setItem(ONLINE_CACHE_KEY, JSON.stringify(cache)); } catch (_) {} }
     const ONLINE_CACHE = readOnlineCache();
+
+    /** 给所有在线请求设置上限，避免 iPad 网络不响应时录入一直卡在“补全中”。 */
+    async function fetchWithTimeout(url, options = {}, timeoutMs = 3500) {
+      if (typeof AbortController === 'undefined') return fetch(url, options);
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try { return await fetch(url, { ...options, signal: controller.signal }); }
+      finally { clearTimeout(timer); }
+    }
 
     /** 调用在线翻译服务并缓存结果，重复录入相同词语时不再重新请求。 */
     async function translateOnline(text) {
@@ -861,7 +905,7 @@
       const cacheKey = `en-zh:${value.toLowerCase()}`;
       if (cache.translations?.[cacheKey]) return cache.translations[cacheKey];
       try {
-        const response = await fetch(`${TRANSLATION_API}?q=${encodeURIComponent(value)}&langpair=en|zh-CN`);
+        const response = await fetchWithTimeout(`${TRANSLATION_API}?q=${encodeURIComponent(value)}&langpair=en|zh-CN`, {}, 2200);
         if (!response.ok) return '';
         const payload = await response.json();
         const translated = String(payload?.responseData?.translatedText || '').trim();
@@ -870,14 +914,25 @@
       } catch (_) { return ''; }
     }
 
-    /** 在线词典没有提供例句时，生成一个明确标注为辅助用法的英文例句。 */
-    function fallbackExampleEn(term, definition = '') { const cleanDefinition = String(definition || '').replace(/[.。]+$/, '').trim(); return cleanDefinition ? `The word "${term}" means ${cleanDefinition}.` : `I learned how to use "${term}" in an English sentence today.`; }
-    function fallbackExampleCn(item) { return item.meaning ? `这个例句帮助理解“${item.meaning}”的用法。` : `今天我学习了“${item.word}”这个英语表达。`; }
+    /** 没有可信来源时保持为空，绝不再生成模板例句。 */
+    function fallbackExampleEn() { return ''; }
+    function fallbackExampleCn() { return ''; }
 
     /** 从词典读取英文语境资料；中文释义优先翻译词典定义，减少孤立机器翻译造成的歧义。 */
     async function lookupWordOnline(item) {
       const term = String(item.word || '').trim();
       if (!term) return item;
+      const phrase = referenceDataFor(term);
+      /* PET 常见词组和已核对的测试词先使用本地资料，避免把词组送进单词 API 后得到整句英文。 */
+      if (phrase) {
+        if (!item.phonetic && phrase.phonetic) item.phonetic = phrase.phonetic;
+        if (!item.meaning && phrase.meaning) item.meaning = phrase.meaning;
+        if (!item.exampleEn && phrase.en) item.exampleEn = phrase.en;
+        if (!item.exampleCn && phrase.cn) item.exampleCn = phrase.cn;
+        item.emoji = item.emoji || getEmoji(item.meaning, term);
+        item.referenceUrl = `${CAMBRIDGE_REFERENCE}${encodeURIComponent(term.toLowerCase().replace(/\s+/g, '-'))}`;
+        return item;
+      }
       let entry = null;
       const isSingleWord = /^[A-Za-z]+(?:['-][A-Za-z]+)?$/.test(term);
       if (isSingleWord && navigator.onLine !== false) {
@@ -886,7 +941,7 @@
           const cacheKey = term.toLowerCase();
           if (cache.dictionary?.[cacheKey]) entry = cache.dictionary[cacheKey];
           else {
-            const response = await fetch(`${DICTIONARY_API}${encodeURIComponent(term)}`);
+            const response = await fetchWithTimeout(`${DICTIONARY_API}${encodeURIComponent(term)}`, {}, 3200);
             if (response.ok) {
               const payload = await response.json();
               entry = Array.isArray(payload) ? payload[0] : null;
@@ -900,11 +955,10 @@
       const definition = definitions.find(item => item.definition)?.definition || '';
       const example = definitions.find(item => item.example)?.example || '';
       if (!item.phonetic && phonetic) item.phonetic = phonetic;
-      if (!item.exampleEn) item.exampleEn = example || fallbackExampleEn(term, definition);
+      if (!item.exampleEn && example) item.exampleEn = example;
       if (!item.meaning) item.meaning = definition ? await translateOnline(definition) : await translateOnline(term);
       if (!item.exampleCn && item.exampleEn) item.exampleCn = await translateOnline(item.exampleEn);
-      if (!item.exampleCn) item.exampleCn = fallbackExampleCn(item);
-      item.emoji = item.emoji || getEmoji(item.meaning);
+      item.emoji = item.emoji || getEmoji(item.meaning, term);
       item.referenceUrl = `${CAMBRIDGE_REFERENCE}${encodeURIComponent(term.toLowerCase().replace(/\s+/g, '-'))}`;
       return item;
     }
@@ -959,7 +1013,26 @@
       if (button) { button.disabled = true; button.textContent = '正在查找…'; }
       const item = { word: wordInput.value.trim(), phonetic: form.querySelector('[name="phonetic"]')?.value.trim() || '', meaning: form.querySelector('[name="meaning"]')?.value.trim() || '', exampleEn: form.querySelector('[name="exampleEn"]')?.value.trim() || '', exampleCn: form.querySelector('[name="exampleCn"]')?.value.trim() || '', emoji: form.querySelector('[name="emoji"]')?.value.trim() || '', hint: form.querySelector('[name="hint"]')?.value.trim() || '' };
       await lookupWordOnline(item);
-      for (const name of ['phonetic', 'meaning', 'exampleEn', 'exampleCn', 'emoji']) { const input = form.querySelector(`[name="${name}"]`); if (input && item[name]) input.value = item[name]; }
+      ensureBilingualExample(item);
+      /* 再从本地核对资料补一次，确保表单不会漏掉词组音标。 */
+      const reference = referenceDataFor(item.word);
+      if (reference) {
+        item.phonetic = item.phonetic || reference.phonetic || '';
+        item.meaning = item.meaning || reference.meaning || '';
+        item.exampleEn = item.exampleEn || reference.en || '';
+        item.exampleCn = item.exampleCn || reference.cn || '';
+        item.emoji = item.emoji || reference.emoji || getEmoji(item.meaning, item.word);
+      }
+      const fill = () => {
+        const activeForm = document.querySelector('#wordForm') || form;
+        for (const name of ['phonetic', 'meaning', 'exampleEn', 'exampleCn', 'emoji']) {
+          const input = activeForm?.querySelector(`[name="${name}"]`);
+          if (input && item[name]) { input.value = item[name]; input.setAttribute('value', item[name]); }
+        }
+      };
+      fill();
+      /* iPad Safari 在异步按钮回调后偶尔会恢复输入框旧值，再补一次当前资料。 */
+      setTimeout(fill, 0);
       if (button) { button.disabled = false; button.textContent = '🌐 在线补全'; }
       showToast(item.meaning ? '在线资料已填入，请确认后保存' : '没有找到中文释义，请检查拼写');
     }
@@ -976,7 +1049,7 @@
         form.append('language', 'eng');
         form.append('OCREngine', '2');
         form.append('isOverlayRequired', 'false');
-        const response = await fetch(OCR_API, { method: 'POST', headers: { apikey: OCR_TEST_KEY }, body: form });
+        const response = await fetchWithTimeout(OCR_API, { method: 'POST', headers: { apikey: OCR_TEST_KEY }, body: form }, 12000);
         if (!response.ok) throw new Error(`OCR ${response.status}`);
         const payload = await response.json();
         const text = (payload?.ParsedResults || []).map(result => result.ParsedText || '').join('\n').replace(/\r/g, '').split('\n').map(line => line.replace(/^\s*(?:\d+[.)、]|[-•])\s*/, '').trim()).filter(Boolean).join('\n');
@@ -993,6 +1066,10 @@
     }
 
     /** 统一的儿童界面工具页：录入、看板、管理、备份不再有家长密码门槛。 */
+    /** 在录入页提供 Cambridge 官方 PET/B1 词表入口，作为备考范围核对来源。 */
+    function renderPetReferenceCard() {
+      return '<section class="card card-pad pet-reference"><div class="eyebrow">📖 正规参考</div><h3 style="margin-top:7px">Cambridge B1 Preliminary（PET）官方词表</h3><p class="muted small" style="line-height:1.65;margin-top:8px">官方词表用于确认 PET 备考范围；每个词的中文释义和双语例句仍需以词典资料核对，不再自动生成模板句。</p><a class="btn btn-secondary btn-block" style="margin-top:14px" href="' + PET_WORDLIST_URL + '" target="_blank" rel="noopener">打开 / 下载官方词表 ↗</a></section>';
+    }
     function renderAdmin() {
       const body = State.adminTab === 'overview' ? renderAdminOverview() : State.adminTab === 'add' ? renderAdminAdd() : State.adminTab === 'manage' ? renderAdminManage() : renderAdminBackup();
       return `<section class="screen admin-screen"><header class="topbar"><div class="brand-lockup"><div class="brand-mark">🧰</div><div><div class="brand-title">学习工具</div><div class="brand-subtitle">词库、看板和备份 · ${State.words.length} 个词</div></div></div><button class="icon-btn" data-action="navigate" data-path="/learn" aria-label="返回学习">←</button></header><nav class="admin-nav"><button class="admin-tab ${State.adminTab === 'overview' ? 'active' : ''}" data-action="admin-tab" data-tab="overview">📊 数据看板</button><button class="admin-tab ${State.adminTab === 'add' ? 'active' : ''}" data-action="admin-tab" data-tab="add">➕ 录入词库</button><button class="admin-tab ${State.adminTab === 'manage' ? 'active' : ''}" data-action="admin-tab" data-tab="manage">📚 管理词库</button><button class="admin-tab ${State.adminTab === 'backup' ? 'active' : ''}" data-action="admin-tab" data-tab="backup">💾 备份恢复</button></nav>${body}${State.importPayload ? renderImportModal() : ''}${navBar()}</section>`;
@@ -1042,7 +1119,7 @@
       if (action === 'start-task') { await startTask(target.dataset.type); return; }
       if (action === 'start-weekly-test') { startWeeklyTest(); return; }
       if (action === 'exit-weekly-test') { if (confirm('确定退出本次周测吗？已完成的项目会在本次检测结束后记录。')) { State.weeklyTest = null; Router.navigate('/learn'); } return; }
-      if (action === 'weekly-meaning-answer') { const test = State.weeklyTest; const word = weeklyCurrentWord(); if (!test || test.correct !== null || !word) return; test.selected = target.dataset.choice; test.correct = target.dataset.choice === word.meaning; if (test.correct) test.meaningScore++; renderWeeklyTest(); return; }
+      if (action === 'weekly-meaning-answer') { const test = State.weeklyTest; const word = weeklyCurrentWord(); if (!test || test.correct !== null || !word) return; test.selected = target.dataset.choice; test.correct = target.dataset.choice === quizMeaning(word); if (test.correct) test.meaningScore++; renderWeeklyTest(); return; }
       if (action === 'weekly-meaning-continue') { if (State.weeklyTest) { State.weeklyTest.stage = 'spelling'; State.weeklyTest.spellValue = ''; State.weeklyTest.spellError = false; State.weeklyTest.spellCorrect = false; renderWeeklyTest(); setTimeout(() => $('[data-input="weekly-spell"]')?.focus(), 60); } return; }
       if (action === 'weekly-check-spell') { const test = State.weeklyTest; const word = weeklyCurrentWord(); if (!test || !word) return; const answer = normalizeWord(test.spellValue || ''); if (answer === normalizeWord(word.word)) { test.spellCorrect = true; if (test.spellingAttempts === 0) test.spellingScore++; Speaker.speakCorrect(word); } else { test.spellingAttempts++; test.spellError = true; } renderWeeklyTest(); return; }
       if (action === 'weekly-next-word') { await advanceWeeklyTest(); return; }
@@ -1050,8 +1127,9 @@
       if (action === 'exit-learning') { exitLearning(); return; }
       if (action === 'flip-card') { State.stageAFlipped = true; renderLearning(); return; }
       if (action === 'self-known' || action === 'self-unknown') { await markSelfKnown(action === 'self-known'); return; }
-      if (action === 'review-self') { const known = target.dataset.known === 'true'; const word = currentWord(); State.currentTask.selfKnown = known; if (!known) await Scheduler.updateWord(word, { status:'struggling', errorCount:(word.errorCount || 0) + 1, nextReview: tomorrowStart() }); State.currentTask.stage = 'C'; State.spell = null; renderLearning(); return; }
-      if (action === 'quiz-answer') { const choice = target.dataset.choice; const correct = choice === currentWord().meaning; State.stageB.selected = choice; State.stageB.correct = correct; if (correct) { renderLearning(); setTimeout(() => { if (State.currentTask?.stage === 'B') { State.currentTask.stage = 'C'; State.spell = null; renderLearning(); } }, 1500); } else { renderLearning(); } return; }
+      if (action === 'review-self') { const known = target.dataset.known === 'true'; const word = currentWord(); State.currentTask.selfKnown = known; if (!known) { await Scheduler.updateWord(word, { status:'struggling', errorCount:(word.errorCount || 0) + 1, nextReview: tomorrowStart() }); State.currentTask.stage = 'R-card'; } else State.currentTask.stage = 'C'; State.spell = null; renderLearning(); return; }
+      if (action === 'review-card-continue') { State.currentTask.stage = 'C'; State.spell = null; renderLearning(); return; }
+      if (action === 'quiz-answer') { const choice = target.dataset.choice; const correct = choice === quizMeaning(currentWord()); State.stageB.selected = choice; State.stageB.correct = correct; if (correct) { renderLearning(); setTimeout(() => { if (State.currentTask?.stage === 'B') { State.currentTask.stage = 'C'; State.spell = null; renderLearning(); } }, 1500); } else { renderLearning(); } return; }
       if (action === 'quiz-continue') { State.currentTask.stage = 'C'; State.spell = null; renderLearning(); return; }
       if (action === 'spell-mode') { State.currentTask.mode = target.dataset.mode; State.spell = { mode: target.dataset.mode, value: '', tiles: shuffle(currentWord().word.toLowerCase().split('').map((letter, index) => ({ letter, key: `${index}-${Math.random()}`, used: false }))), error: false, success: false }; renderLearning(); return; }
       if (action === 'pick-letter') { const tile = State.spell.tiles.find(item => item.key === target.dataset.key); if (!tile || tile.used) return; const max = currentWord().word.length; if (State.spell.value.length >= max) return; tile.used = true; State.spell.value += tile.letter; State.spell.error = false; renderLearning(); return; }
@@ -1261,32 +1339,91 @@
     }
 
     /**
-     * 标准示例库：词典没有提供短语例句时，使用经过人工整理的常用表达。
-     * 这些内容只作为在线词典无结果时的兜底，不会覆盖用户自己填写的例句。
+     * 少量 PET 常见词组的人工核对资料。官方 PET 词表本身主要规定备考范围，
+     * 不提供每个词条的完整中文释义和双语例句，因此这里只放可核对的短语资料。
      */
     const STANDARD_PHRASE_EXAMPLES = {
-      'a variety of': { en: 'The library has a variety of books for children.', cn: '这家图书馆有各种各样的儿童读物。' },
-      'public transport': { en: 'Many people use public transport to travel around the city.', cn: '许多人乘坐公共交通在城市里出行。' },
-      'publick transport': { en: 'Many people use public transport to travel around the city.', cn: '许多人乘坐公共交通在城市里出行。' }
+      'a variety of': { phonetic: '/ə vəˈraɪəti əv/', meaning: '各种各样的；多种多样的', en: 'The library has a variety of books for children.', cn: '这家图书馆有各种各样的儿童读物。' },
+      'public transport': { phonetic: '/ˌpʌblɪk ˈtrænspɔːt/', meaning: '公共交通', en: 'Many people use public transport to travel around the city.', cn: '许多人乘坐公共交通在城市里出行。' },
+      /* 常见拼写错误仍可识别，但保存时保留用户输入，方便家长看到并修改。 */
+      'publick transport': { phonetic: '/ˌpʌblɪk ˈtrænspɔːt/', meaning: '公共交通（public transport）', en: 'Many people use public transport to travel around the city.', cn: '许多人乘坐公共交通在城市里出行。' }
     };
-    function standardPhraseExample(term) { return STANDARD_PHRASE_EXAMPLES[String(term || '').toLowerCase().replace(/\s+/g, ' ').trim()] || null; }
+    /* 针对测试中已经出现的 PET 天气词汇提供人工核对资料，避免旧数据把英文例句误当成中文释义。 */
+    const CURATED_PET_WORDS = {
+      'weather forecast': { phonetic: '/ˈweðə ˈfɔːkɑːst/', meaning: '天气预报', en: 'The weather forecast says it will rain tomorrow.', cn: '天气预报说，明天会下雨。', emoji: '🌦️' },
+      thunder: { phonetic: '/ˈθʌndə(r)/', meaning: '雷；雷声', en: 'We could hear the thunder even before the rain came.', cn: '还没下雨，我们就能听到雷声了。', emoji: '⛈️' },
+      lightning: { phonetic: '/ˈlaɪtnɪŋ/', meaning: '闪电', en: 'The lightning lit up the night sky.', cn: '闪电照亮了夜空。', emoji: '⚡' },
+      shower: { phonetic: '/ˈʃaʊə(r)/', meaning: '阵雨；淋浴', en: 'There will be a brief shower in the afternoon.', cn: '下午会有一场短暂的阵雨。', emoji: '🚿' },
+      freezing: { phonetic: '/ˈfriːzɪŋ/', meaning: '极冷的；冰冻的', en: 'It was freezing outside, so I put on my coat.', cn: '外面非常冷，所以我穿上了外套。', emoji: '🥶' },
+      frost: { phonetic: '/frɒst/', meaning: '霜；霜冻', en: 'The grass was covered with frost this morning.', cn: '今天早上草地上覆盖着霜。', emoji: '❄️' },
+      foggy: { phonetic: '/ˈfɒɡi/', meaning: '有雾的', en: 'It was foggy, so we drove slowly.', cn: '天气有雾，所以我们开得很慢。', emoji: '🌫️' },
+      thunderstorm: { phonetic: '/ˈθʌndəstɔːm/', meaning: '雷雨；雷暴', en: 'A thunderstorm is expected this evening.', cn: '预计今天晚上会有雷暴。', emoji: '⛈️' },
+      celebrate: { phonetic: '/ˈselɪbreɪt/', meaning: '庆祝', en: 'We celebrate Christmas every year.', cn: '我们每年都庆祝圣诞节。', emoji: '🎉' },
+      accommodation: { phonetic: '/əˌkɒməˈdeɪʃn/', meaning: '住处；住宿', en: 'The hotel provides accommodation for up to 500 guests.', cn: '这家酒店可为多达500位客人提供住宿。', emoji: '🏨' },
+      advertisement: { phonetic: '/ədˈvɜːtɪsmənt/', meaning: '广告', en: 'I saw an advertisement for a new smartphone on TV.', cn: '我在电视上看到一则新智能手机的广告。', emoji: '📺' },
+      book: { phonetic: '/bʊk/', meaning: '书；书籍', en: 'I borrowed an interesting book from the library.', cn: '我从图书馆借了一本有趣的书。', emoji: '📖' },
+      school: { phonetic: '/skuːl/', meaning: '学校', en: 'Our school has a large library.', cn: '我们学校有一个很大的图书馆。', emoji: '🏫' },
+      hospital: { phonetic: '/ˈhɒspɪtl/', meaning: '医院', en: 'The hospital is near the train station.', cn: '医院在火车站附近。', emoji: '🏥' },
+      journey: { phonetic: '/ˈdʒɜːni/', meaning: '旅行；旅程', en: 'The journey took three hours by train.', cn: '这段旅程乘火车花了三个小时。', emoji: '🧳' }
+    };
+    function normalizeLookupTerm(term) { return String(term || '').toLowerCase().replace(/\s+/g, ' ').trim(); }
+    function standardPhraseExample(term) { return STANDARD_PHRASE_EXAMPLES[normalizeLookupTerm(term)] || null; }
+    function curatedPetWord(term) { return CURATED_PET_WORDS[normalizeLookupTerm(term)] || null; }
+    function referenceDataFor(term) { return standardPhraseExample(term) || curatedPetWord(term); }
+    function looksLikeBadMeaning(value) {
+      const text = String(value || '').trim();
+      if (!text) return true;
+      const chineseCount = (text.match(/[\u3400-\u9fff]/g) || []).length;
+      return chineseCount < 2 || /[#\[\].!?]/.test(text) || /\b(?:the|we|there|was|were|could|will|even|before|morning|afternoon|grass|rain|n\.)\b/i.test(text) || /[A-Za-z]{2,}\s+[A-Za-z]{2,}/.test(text);
+    }
+    function looksLikeBadExample(value) { return !String(value || '').trim() || /^(?:The word|I learned how to use)/i.test(String(value || '').trim()); }
     function fallbackExampleEn(term, definition = '') {
       const phrase = standardPhraseExample(term);
-      if (phrase) return phrase.en;
-      const cleanDefinition = String(definition || '').replace(/[.。]+$/, '').trim();
-      return cleanDefinition ? `The word "${term}" means ${cleanDefinition}.` : `I learned how to use "${term}" in an English sentence today.`;
+      return phrase?.en || '';
     }
     function fallbackExampleCn(item) {
       const phrase = standardPhraseExample(item?.word);
-      if (phrase) return phrase.cn;
-      return item?.meaning ? `这个例句帮助理解“${item.meaning}”的用法。` : `今天我学习了“${item?.word || ''}”这个英语表达。`;
+      return phrase?.cn || '';
     }
-    /** 保存前统一补齐截图标准中的：音标、中文释义、英文例句、中文翻译和 Emoji。 */
+    /** 保存前只保留真实资料；缺少例句时留空并阻止保存，避免模板污染词库。 */
     function ensureBilingualExample(item) {
+      const phrase = referenceDataFor(item.word);
+      if (!item.phonetic && phrase?.phonetic) item.phonetic = phrase.phonetic;
+      if (!item.meaning && phrase?.meaning) item.meaning = phrase.meaning;
       item.exampleEn = String(item.exampleEn || '').trim() || fallbackExampleEn(item.word);
       item.exampleCn = String(item.exampleCn || '').trim() || fallbackExampleCn(item);
-      item.emoji = String(item.emoji || '').trim() || getEmoji(item.meaning);
+      item.emoji = String(item.emoji || '').trim() || getEmoji(item.meaning, item.word);
       return item;
+    }
+    /** 清理早期版本写入的模板例句，并为旧词条重新匹配本地 Emoji。 */
+    async function cleanStoredWordData(words) {
+      const fakeEn = [/^The word ".+" means .+\.$/i, /^I learned how to use ".+" in an English sentence today\.$/i];
+      const fakeCn = [/^这个例句帮助理解“.*”的用法。$/, /^今天我学习了“.*”这个英语表达。$/];
+      const repairCurated = localStorage.getItem('petCuratedRepairV2') !== 'true';
+      const cleaned = [];
+      for (const word of words || []) {
+        const next = { ...word };
+        let changed = false;
+        if (fakeEn.some(pattern => pattern.test(String(next.exampleEn || '').trim()))) { next.exampleEn = ''; changed = true; }
+        if (fakeCn.some(pattern => pattern.test(String(next.exampleCn || '').trim()))) { next.exampleCn = ''; changed = true; }
+        const curated = repairCurated ? referenceDataFor(next.word) : null;
+        if (curated) {
+          /* 这次迁移只修复已知旧版错配词；以后家长手动编辑的内容不会被覆盖。 */
+          next.phonetic = curated.phonetic || next.phonetic;
+          next.meaning = curated.meaning || next.meaning;
+          /* V2 迁移会把已知测试词的旧错配例句一并替换；之后不再覆盖家长手动修改的内容。 */
+          if (repairCurated && curated.en) next.exampleEn = curated.en;
+          if (repairCurated && curated.cn) next.exampleCn = curated.cn;
+          if (!next.hint && curated.hint) next.hint = curated.hint;
+          changed = true;
+        }
+        const expectedEmoji = getEmoji(next.meaning, next.word);
+        if (!next.emoji || next.emoji === EMOJI_MAP.default) { next.emoji = expectedEmoji; changed = true; }
+        if (changed && next.id !== undefined) await DB.put('words', next);
+        cleaned.push(next);
+      }
+      if (repairCurated) localStorage.setItem('petCuratedRepairV2', 'true');
+      return cleaned;
     }
     /** 新词只需输入英文；保存时按截图标准自动查资料并写入完整词条。 */
     async function saveWordForm(form) {
@@ -1479,7 +1616,7 @@
     function renderAdminBackup() { return '<div class="admin-layout"><section class="card card-pad"><div class="eyebrow">数据备份</div><h2 style="margin-top:7px">带走你的学习记录</h2><p class="muted" style="line-height:1.7;margin-top:10px">导出文件包含单词本、词库、学习设置和每日记录。</p><button class="btn btn-primary btn-block" style="margin-top:18px" data-action="export-data">⬇️ 导出 JSON 备份</button></section><section class="card card-pad"><div class="eyebrow">数据恢复</div><h2 style="margin-top:7px">从备份继续</h2><p class="muted" style="line-height:1.7;margin-top:10px">导入旧版备份时，词条会自动放入当前单词本；新版备份会保留全部单词本。</p><label class="btn btn-secondary btn-block" style="margin-top:18px">⬆️ 选择 JSON 文件<input type="file" accept=".json,application/json" data-input="import-file" hidden></label><div class="notice" style="margin-top:14px">恢复数据会影响本机当前词库，操作前可以先导出一份当前备份。</div></section></div>'; }
     function renderAdmin() {
       const body = State.adminTab === 'overview' ? renderAdminOverview() : State.adminTab === 'add' ? renderAdminAdd() : State.adminTab === 'manage' ? renderAdminManage() : State.adminTab === 'notebooks' ? renderNotebookManager() : renderAdminBackup();
-      return '<section class="screen admin-screen"><header class="topbar"><div class="brand-lockup"><div class="brand-mark">📚</div><div><div class="brand-title">希希词语家</div><div class="brand-subtitle">当前单词本：' + escapeHtml(notebookName(State.activeNotebookId)) + '</div></div></div><button class="icon-btn" data-action="navigate" data-path="/learn" aria-label="返回学习">←</button></header><nav class="admin-nav"><button class="admin-tab ' + (State.adminTab === 'overview' ? 'active' : '') + '" data-action="admin-tab" data-tab="overview">🪙 成长榜</button><button class="admin-tab ' + (State.adminTab === 'add' ? 'active' : '') + '" data-action="admin-tab" data-tab="add">➕ 录入词库</button><button class="admin-tab ' + (State.adminTab === 'manage' ? 'active' : '') + '" data-action="admin-tab" data-tab="manage">📚 管理词库</button><button class="admin-tab ' + (State.adminTab === 'notebooks' ? 'active' : '') + '" data-action="admin-tab" data-tab="notebooks">🗂️ 单词本</button><button class="admin-tab ' + (State.adminTab === 'backup' ? 'active' : '') + '" data-action="admin-tab" data-tab="backup">💾 备份</button></nav>' + body + (State.importPayload ? renderImportModal() : '') + navBar() + '</section>';
+      return '<section class="screen admin-screen"><header class="topbar"><div class="brand-lockup"><div class="brand-mark">📚</div><div><div class="brand-title">希希词语家</div><div class="brand-subtitle">当前单词本：' + escapeHtml(notebookName(State.activeNotebookId)) + '</div></div></div><button class="icon-btn" data-action="navigate" data-path="/learn" aria-label="返回学习">←</button></header><nav class="admin-nav"><button class="admin-tab ' + (State.adminTab === 'overview' ? 'active' : '') + '" data-action="admin-tab" data-tab="overview">🪙 成长榜</button><button class="admin-tab ' + (State.adminTab === 'add' ? 'active' : '') + '" data-action="admin-tab" data-tab="add">➕ 录入词库</button><button class="admin-tab ' + (State.adminTab === 'manage' ? 'active' : '') + '" data-action="admin-tab" data-tab="manage">📚 管理词库</button><button class="admin-tab ' + (State.adminTab === 'notebooks' ? 'active' : '') + '" data-action="admin-tab" data-tab="notebooks">🗂️ 单词本</button><button class="admin-tab ' + (State.adminTab === 'backup' ? 'active' : '') + '" data-action="admin-tab" data-tab="backup">💾 备份</button></nav>' + body + (State.adminTab === 'add' ? renderPetReferenceCard() : '') + (State.importPayload ? renderImportModal() : '') + navBar() + '</section>';
     }
 
     /** 移动单词时保留历史积分，但从原单词本的未完成计划中移除。 */
@@ -1553,21 +1690,72 @@
       if (!next.word) { showToast('请先填写英文单词或词组'); return; }
       const duplicate = State.words.find(word => word.word.toLowerCase() === next.word.toLowerCase() && word.id !== next.id); if (duplicate) { showToast('词库里已经有这个单词啦'); return; }
       if (!next.meaning || !next.exampleEn || !next.exampleCn || !next.phonetic) { showToast('正在自动补全释义、音标和中英文例句…'); await lookupWordOnline(next); }
-      if (!next.meaning) { showToast('暂时没有查到中文释义，请检查单词拼写'); return; } ensureBilingualExample(next); if (!suppliedEmoji) next.emoji = getEmoji(next.meaning);
+      ensureBilingualExample(next);
+      const missing = [['中文释义', next.meaning], ['音标', next.phonetic], ['英文例句', next.exampleEn], ['中文翻译', next.exampleCn]].filter(([, value]) => !String(value || '').trim()).map(([label]) => label);
+      if (missing.length) { showToast('资料不完整：' + missing.join('、') + '。请点击在线补全或手动填写后再保存。'); return; }
+      if (!suppliedEmoji) next.emoji = getEmoji(next.meaning, next.word);
       await DB.put('words', next); State.words = await DB.all('words'); State.editingWordId = null; State.wordImageDraft = null; State.wordImageSource = null; State.wordImageTitle = ''; State.imageStatus = ''; await ensureDailyLog(); showToast(existing ? '单词已更新' : '单词已加入“' + notebookName(bookId) + '”'); render();
     }
     async function saveBatch() {
       const items = State.batchPreview; const bookId = Number(State.batchNotebookId || State.activeNotebookId); const existingWords = new Set(State.words.map(word => word.word.toLowerCase()));
       if (items.some(item => !item.meaning || !item.phonetic || !item.exampleEn || !item.exampleCn)) { showToast('正在准备每个词的释义、音标和中英文例句…'); await mapOnlineWithConcurrency(items, async item => { await lookupWordOnline(item); ensureBilingualExample(item); }, 6); }
-      const incomplete = items.filter(item => !String(item.meaning || '').trim()); if (incomplete.length) { showToast(incomplete.length + ' 个词没有查到中文释义，暂不录入。'); render(); return; }
-      let added = 0; for (const item of items) { ensureBilingualExample(item); if (!item.emoji) item.emoji = getEmoji(item.meaning); if (existingWords.has(item.word.toLowerCase())) continue; await DB.put('words', { ...item, notebookId: bookId, status: 'new', reviewCount: 0, lastReview: 0, nextReview: 0, errorCount: 0, createdAt: Date.now() + added }); added++; }
+      const incomplete = items.filter(item => !String(item.meaning || '').trim() || !String(item.phonetic || '').trim() || !String(item.exampleEn || '').trim() || !String(item.exampleCn || '').trim());
+      if (incomplete.length) { showToast(incomplete.length + ' 个词资料不完整，暂不录入。请补充中文释义、音标和真实中英文例句。'); render(); return; }
+      let added = 0; for (const item of items) { ensureBilingualExample(item); if (!item.emoji) item.emoji = getEmoji(item.meaning, item.word); if (existingWords.has(item.word.toLowerCase())) continue; await DB.put('words', { ...item, notebookId: bookId, status: 'new', reviewCount: 0, lastReview: 0, nextReview: 0, errorCount: 0, createdAt: Date.now() + added }); added++; }
       State.words = await DB.all('words'); State.batchPreview = []; State.batchText = ''; await ensureDailyLog(); showToast(added ? '已录入 ' + added + ' 个单词到“' + notebookName(bookId) + '”' : '重复单词已跳过'); render();
     }
-    async function saveBatchInput() { if (!State.batchPreview.length) { showToast('请先解析单词'); return; } if (State.batchPreview.some(item => !item.meaning.trim())) await lookupBatchOnline(); const incomplete = State.batchPreview.filter(item => !item.meaning.trim()); if (incomplete.length) { showToast(incomplete.length + ' 个词暂时没有中文释义，请联网补全或手动填写'); return; } await saveBatch(); }
+    async function saveBatchInput() { if (!State.batchPreview.length) { showToast('请先解析单词'); return; } await saveBatch(); }
+    /** 词组拼写统一忽略空格；拖拽模式只显示字母，避免把空格当成一个可点击字母。 */
+    function normalizeSpellDisplay(value = '') { return String(value || '').toLowerCase().replace(/\s+/g, ''); }
+    function renderStageC(word) {
+      const spell = State.spell || (State.spell = { mode: State.currentTask.mode || 'keyboard', value: '', tiles: shuffle(normalizeSpellDisplay(word.word).split('').map((letter, index) => ({ letter, key: `${index}-${Math.random()}`, used: false }))), error: false, success: false, compare: '' });
+      if (spell.success) return `<article class="card spell-card spell-success"><div class="success-icon">🌟</div><h2>拼写正确！</h2><p class="muted">${escapeHtml(word.word)} 已经记住啦</p><button class="btn btn-success btn-block" style="margin-top:28px" data-action="next-word">继续下一个 →</button></article>`;
+      const answer = normalizeSpellDisplay(word.word);
+      const slots = Array.from({ length: answer.length }, (_, index) => `<span class="slot ${spell.value[index] ? 'filled' : ''}">${escapeHtml(spell.value[index] || '')}</span>`).join('');
+      return `<article class="card spell-card"><div class="eyebrow">最后一关</div><h2 style="margin-top:8px;text-align:center">请拼写这个单词</h2><div class="spell-prompt"><div class="meaning-large">${escapeHtml(word.meaning)}</div>${word.exampleEn ? `<div class="spell-example">${highlightBlank(word.exampleEn, word.word)}</div>` : ''}<div class="phonetic" style="margin-top:12px">${escapeHtml(word.phonetic || '')}</div></div><div class="mode-toggle"><button class="mode-btn ${spell.mode === 'keyboard' ? 'active' : ''}" data-action="spell-mode" data-mode="keyboard">⌨️ 键盘输入</button><button class="mode-btn ${spell.mode === 'drag' ? 'active' : ''}" data-action="spell-mode" data-mode="drag">🔤 拖拽字母</button></div>${spell.mode === 'keyboard' ? `<input class="input spell-input ${spell.error ? 'error' : ''}" data-input="spell-value" value="${escapeHtml(spell.value)}" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="输入英文单词或词组" aria-label="拼写答案">` : `<div class="drag-slots">${slots}</div><div class="letter-bank">${spell.tiles.map(tile => `<button class="letter-tile ${tile.used ? 'used' : ''}" data-action="pick-letter" data-key="${escapeHtml(tile.key)}" ${tile.used ? 'disabled' : ''}>${escapeHtml(tile.letter)}</button>`).join('')}</div>`}<div class="spell-actions"><button class="btn btn-secondary" data-action="spell-hint" ${State.currentTask.hintCount >= 3 ? 'disabled' : ''}>💡 提示 ${State.currentTask.hintCount ? `(${State.currentTask.hintCount}/3)` : ''}</button><button class="btn btn-primary" data-action="check-spell">检查答案</button></div>${spell.error ? `<div class="compare">${compareSpelling(spell.value, answer)}</div><div class="feedback-bad" style="text-align:center;margin-top:11px;font-weight:800">再试一次 💪 ${State.currentTask.spellAttempts >= 3 ? '这个单词有点难，我们明天再练。' : ''}</div>` : '<div class="muted tiny" style="text-align:center;margin-top:14px">拼写正确才能过关，可以无限次尝试</div>'}</article>`;
+    }
+    /** 处理拖拽拼写和提示，保证 a variety of 这类词组不会把空格算错。 */
+    document.addEventListener('click', (event) => {
+      const target = event.target.closest('[data-action]'); if (!target) return;
+      const action = target.dataset.action; if (!['spell-mode', 'pick-letter', 'spell-hint'].includes(action)) return;
+      if (!State.currentTask || State.currentTask.stage !== 'C') return;
+      event.preventDefault(); event.stopPropagation();
+      const word = currentWord(); if (!word) return;
+      if (action === 'spell-mode') {
+        State.currentTask.mode = target.dataset.mode;
+        State.spell = { mode: target.dataset.mode, value: '', tiles: shuffle(normalizeSpellDisplay(word.word).split('').map((letter, index) => ({ letter, key: `${index}-${Math.random()}`, used: false }))), error: false, success: false, compare: '' };
+      } else if (action === 'pick-letter') {
+        const tile = State.spell?.tiles.find(item => item.key === target.dataset.key); if (!tile || tile.used) return;
+        if (State.spell.value.length >= normalizeSpellDisplay(word.word).length) return;
+        tile.used = true; State.spell.value += tile.letter; State.spell.error = false;
+      } else {
+        const letters = normalizeSpellDisplay(word.word); const hintIndex = Math.min(State.currentTask.hintCount, Math.max(0, letters.length - 1)); State.currentTask.hintCount++;
+        if (State.spell?.mode === 'keyboard') State.spell.value = letters.slice(0, Math.max(State.spell.value.length, hintIndex + 1));
+        else { const expected = letters[hintIndex]; const tile = State.spell?.tiles.find(item => !item.used && item.letter === expected); if (tile) { tile.used = true; State.spell.value += expected; } }
+        if (State.spell) State.spell.error = false;
+      }
+      renderLearning();
+    }, true);
     /* 解析后固定这批词的归属，避免用户切换单词本时误放位置。 */
     document.addEventListener('click', (event) => {
       const target = event.target.closest('[data-action="parse-batch"]'); if (!target) return; State.batchNotebookId = Number(State.activeNotebookId);
     }, true);
+
+    /** 空单词本不能显示“已完成”；只有确实存在今日任务时才显示完成状态。 */
+    function renderDashboard() {
+      const log = currentLog() || { wordsStudied: [], wordsReviewed: [], plannedNew: [], plannedReview: [] };
+      const newWords = (log.plannedNew || []).map(id => State.words.find(word => word.id === id)).filter(Boolean);
+      const reviewWords = (log.plannedReview || []).map(id => State.words.find(word => word.id === id)).filter(Boolean);
+      const newDone = (log.wordsStudied || []).length; const reviewDone = (log.wordsReviewed || []).length;
+      const total = newWords.length + reviewWords.length; const newHasTask = newWords.length > 0; const reviewHasTask = reviewWords.length > 0;
+      const newComplete = !newHasTask || newDone >= newWords.length; const reviewComplete = !reviewHasTask || reviewDone >= reviewWords.length;
+      const dailyDone = total > 0 && newComplete && reviewComplete; const book = activeNotebook(); const week = weekStats(); const growth = growthStats(); const percent = Math.min(100, Math.round(week.completed / 30 * 100));
+      const newStatus = newHasTask ? (newDone >= newWords.length ? '<span class="task-status">已完成 ✅</span>' : '<span class="task-status pending">新词任务</span>') : '<span class="task-status lock">暂无新词</span>';
+      const reviewStatus = reviewHasTask ? (reviewDone >= reviewWords.length ? '<span class="task-status">已完成 ✅</span>' : newComplete ? '<span class="task-status pending">复习任务</span>' : '<span class="task-status lock">🔒 待解锁</span>') : '<span class="task-status lock">暂无复习</span>';
+      const newButton = newHasTask ? '<button class="btn ' + (newComplete ? 'btn-secondary' : 'btn-primary') + ' btn-block" data-action="start-task" data-type="new" ' + (newComplete ? 'disabled' : '') + '>' + (newComplete ? '新词已学完' : '开始新词学习 →') + '</button>' : '<button class="btn btn-secondary btn-block" disabled>' + (State.words.length ? '这个单词本暂无新词' : '请先添加单词') + '</button>';
+      const reviewButton = reviewHasTask ? '<button class="btn ' + (!newComplete || reviewComplete ? 'btn-secondary' : 'btn-warning') + ' btn-block" data-action="start-task" data-type="review" ' + (!newComplete || reviewComplete ? 'disabled' : '') + '>' + (reviewComplete ? '复习已完成' : !newComplete ? '完成新词后解锁' : '开始复习 →') + '</button>' : '<button class="btn btn-secondary btn-block" disabled>今天没有到期复习词</button>';
+      return '<section class="screen"><header class="topbar"><div class="brand-lockup"><div class="brand-mark">' + escapeHtml(book?.icon || '📚') + '</div><div><div class="brand-title">希希词语家</div><div class="brand-subtitle">当前学习：' + escapeHtml(book?.name || '单词本') + '</div></div></div></header><div class="stack">' + notebookSelector() + '<section class="card hero-card"><div class="eyebrow">本周学习进度</div><div class="hero-number">' + week.completed + '<span> / 30 个词</span></div><div>每天一点点，词汇会长大 🌱</div><div class="progress-track"><div class="progress-fill" style="width:' + percent + '%"></div></div><div class="progress-meta"><span>' + (week.completed ? '已经坚持 ' + week.days + ' 天' : '今天也来学一点') + '</span><span>' + percent + '%</span></div></section><section class="card coin-hero"><div class="eyebrow">个人打卡榜 · 我的希币</div><div class="coin-number">' + growth.coins + '<span> 希币</span></div><div>积分 ' + growth.coins + ' 分 · 今天 +' + growth.todayCoins + ' 希币</div><button class="btn" style="margin-top:15px;color:#9a5600;background:#fff" data-action="open-admin-tab" data-tab="overview">查看成长榜 →</button></section><section class="stack"><div class="section-heading"><h2>今天学什么</h2><span class="badge ' + (dailyDone ? 'green' : total ? 'blue' : 'orange') + '">' + (dailyDone ? '全部完成' : total ? (newDone + reviewDone) + ' / ' + total : '先添加单词') + '</span></div><article class="card task-card new-task"><div class="row between"><div class="task-icon">📘</div>' + newStatus + '</div><div><div class="task-title">今日新学 · ' + newWords.length + ' 个</div><div class="task-caption">' + (newHasTask ? '认识新朋友，完成拼写就能获得希币。' : State.words.length ? '这个单词本今天没有安排新的学习词条。' : '词库里还没有单词，添加后就可以开始学习。') + '</div></div>' + (newHasTask ? '<div class="word-preview">' + newWords.map(word => escapeHtml(word.word)).join(' · ') + '</div>' : '') + newButton + '</article><article class="card task-card review-task ' + (!newComplete && reviewHasTask ? 'locked' : '') + '"><div class="row between"><div class="task-icon">📙</div>' + reviewStatus + '</div><div><div class="task-title">今日复习 · ' + reviewWords.length + ' 个</div><div class="task-caption">' + (!newComplete ? '完成今日新词后，就能开始复习啦。' : reviewHasTask ? '把学过的单词再叫醒一次。' : '今天没有到期复习词，轻松完成！') + '</div></div>' + reviewButton + '</article></section>' + renderWeeklyTestCard(getWeeklyTestWords()) + '<section class="card card-pad"><div class="row between"><div><h3>' + (dailyDone ? '今日完成！明天见 🌟' : total ? '准备好了吗？' : '先准备学习内容吧') + '</h3><p class="muted small" style="margin-top:6px">' + (dailyDone ? '你的学习和希币都已经被记录下来。' : total ? '每个新词完成拼写后，会获得1枚希币。' : '先在工具中录入单词，再开始学习。') + '</p></div><div style="font-size:35px">' + (dailyDone ? '🎉' : total ? '🧠' : '📚') + '</div></div></section></div>' + navBar() + '</section>';
+    }
     init();
   </script>
 </body>
