@@ -244,6 +244,12 @@
     .preview-item { padding: 11px; border: 1px solid var(--border); border-radius: 13px; background: #fafbfc; }
     .preview-item strong { font-size: 15px; }
     .preview-item .muted.small:empty::before { content: '待补充中文释义'; color: var(--warning); }
+    .ocr-result { margin-top: 12px; padding: 12px; border: 1px dashed #9fc5f2; border-radius: 14px; background: #f6fbff; }
+    .ocr-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 9px; }
+    .ocr-chip { display: inline-flex; align-items: center; min-height: 34px; padding: 6px 10px; color: var(--primary-dark); background: #e8f3ff; border-radius: 999px; font-size: 13px; font-weight: 800; }
+    .ocr-raw { margin-top: 9px; color: var(--text-secondary); font-size: 12px; }
+    .ocr-raw pre { max-height: 150px; overflow: auto; margin-top: 7px; padding: 10px; white-space: pre-wrap; word-break: break-word; color: var(--text); background: #fff; border: 1px solid var(--border); border-radius: 11px; }
+    .preview-item .preview-actions { display: flex; justify-content: flex-end; gap: 7px; margin-top: 9px; }
     .canvas-wrap { position: relative; height: 220px; }
     .canvas-wrap canvas { width: 100%; height: 100%; }
     .login-screen { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
@@ -2025,6 +2031,203 @@
       showToast(existing ? '单词已更新' : '单词已加入词库');
       render();
     }
+
+    /* ==================== 正式录入引擎 V4 ====================
+       录入、拍照OCR和旧数据修复的唯一最终入口。前面的旧函数仅保留兼容。 */
+    const IMPORT_ENGINE_VERSION = '4.0';
+    const IMPORT_ALIASES = {
+      'publick transport':'public transport', 'accomadation':'accommodation', 'accomodation':'accommodation',
+      'wheather forecast':'weather forecast', 'thundertorm':'thunderstorm', 'celabrate':'celebrate', 'variety of':'a variety of'
+    };
+    Object.assign(CURATED_PET_WORDS, {
+      'look after': { phonetic:'/lʊk ˈɑːftə(r)/', meaning:'照顾；照看', en:'Mia looks after her younger brother after school.', cn:'米娅放学后照看弟弟。', emoji:'🤝' },
+      'take part in': { phonetic:'/teɪk pɑːt ɪn/', meaning:'参加；参与', en:'Our class will take part in the school sports day.', cn:'我们班将参加学校运动会。', emoji:'🏃' },
+      'get on with': { phonetic:'/ɡet ɒn wɪð/', meaning:'与……相处融洽；继续做', en:'I get on well with the other students in my class.', cn:'我和班里的其他同学相处得很好。', emoji:'👫' },
+      'be interested in': { phonetic:'/bi ˈɪntrəstɪd ɪn/', meaning:'对……感兴趣', en:'She is interested in learning about animals.', cn:'她对了解动物很感兴趣。', emoji:'🔎' },
+      'at least': { phonetic:'/ət liːst/', meaning:'至少', en:'Try to read for at least twenty minutes every day.', cn:'尽量每天至少阅读二十分钟。', emoji:'⏱️' },
+      environment: { phonetic:'/ɪnˈvaɪrənmənt/', meaning:'环境', en:'We should all help to protect the environment.', cn:'我们都应该帮助保护环境。', emoji:'🌍' },
+      luggage: { phonetic:'/ˈlʌɡɪdʒ/', meaning:'行李', en:'Please leave your luggage beside the door.', cn:'请把行李放在门旁边。', emoji:'🧳' },
+      volunteer: { phonetic:'/ˌvɒlənˈtɪə(r)/', meaning:'志愿者；自愿做', en:'She works as a volunteer at the animal centre.', cn:'她在动物中心做志愿者。', emoji:'🙋' },
+      improve: { phonetic:'/ɪmˈpruːv/', meaning:'改善；提高', en:'Reading every day can improve your English.', cn:'每天阅读可以提高你的英语水平。', emoji:'📈' }
+    });
+    const IMPORT_HINTS = {
+      accommodation:'ac-（朝向）+ commod（方便）+ -ation（名词后缀）→ 住处', advertisement:'让目光转向它 → 广告', celebrate:'想象大家一起举起彩带庆祝',
+      'weather forecast':'weather（天气）+ forecast（预报）', forecast:'fore-（提前）+ cast（投出）→ 提前说出', foggy:'fog（雾）+ -gy → 有雾的', freezing:'freeze（结冰）→ 冷得要结冰',
+      frost:'想象清晨草叶上的白霜', lightning:'light（光）→ 闪电照亮天空', thunder:'天空轰隆隆的雷声', shower:'像淋浴一样突然落下的一阵雨', thunderstorm:'thunder（雷）+ storm（风暴）',
+      snowstorm:'snow（雪）+ storm（风暴）', chilly:'冷得轻轻发抖的清晨', cloudy:'cloud（云）+ -y', sunny:'sun（太阳）+ -ny', rainy:'rain（雨）+ -y', windy:'wind（风）+ -y', snowy:'snow（雪）+ -y',
+      storm:'大风大雨一起袭来', warm:'双手靠近暖暖的太阳', cool:'傍晚微风带来凉爽', cold:'冷了要穿 coat', misty:'mist（薄雾）+ -y', drizzle:'比 rain 更轻的小雨', rainbow:'rain（雨）+ bow（弓）', breeze:'树叶轻轻动的微风',
+      humid:'空气里像有很多小水滴', temperature:'看到温度计就想到 temperature', 'public transport':'public（公共的）+ transport（交通）', 'a variety of':'variety 表示“多样”',
+      'look after':'在后面看着、照料某人', 'take part in':'成为其中一部分 → 参加', 'get on with':'一起顺利向前走 → 相处融洽', 'be interested in':'interested 后面常跟 in', 'at least':'least 是“最少”',
+      environment:'想象地球周围的一切环境', journey:'提着行李开始旅程', luggage:'旅行时拖着走的行李', volunteer:'主动举手帮助别人', improve:'成绩箭头向上 → 提高'
+    };
+    for (const [word, data] of Object.entries(CURATED_PET_WORDS)) { data.hint = data.hint || IMPORT_HINTS[word] || ''; data.contentSource = '人工校对资料 v4'; }
+    for (const [word, data] of Object.entries(STANDARD_PHRASE_EXAMPLES)) { data.hint = data.hint || IMPORT_HINTS[IMPORT_ALIASES[word] || word] || ''; data.emoji = data.emoji || getEmoji(data.meaning, word); data.contentSource = '人工校对资料 v4'; }
+
+    function normalizeLookupTerm(term) {
+      const normalized = String(term || '').toLowerCase().replace(/[’‘]/g,"'").replace(/[^a-z'\-\s]/g,' ').replace(/\s+/g,' ').trim();
+      return IMPORT_ALIASES[normalized] || normalized;
+    }
+    function importRecordFor(rawTerm, supplied = {}) {
+      const original = String(rawTerm || '').toLowerCase().replace(/[’‘]/g,"'").replace(/[^a-z'\-\s]/g,' ').replace(/\s+/g,' ').trim();
+      const word = normalizeLookupTerm(original); const reference = referenceDataFor(word);
+      const record = { word, originalWord:original, correction:original && original !== word ? `${original} → ${word}` : '', phonetic:'', meaning:'', exampleEn:'', exampleCn:'', emoji:'', hint:'', contentSource:'待核对资料', referenceUrl:`${CAMBRIDGE_REFERENCE}${encodeURIComponent(word.replace(/\s+/g,'-'))}`, ...supplied };
+      if (reference) { record.phonetic=record.phonetic || reference.phonetic || ''; record.meaning=record.meaning || reference.meaning || ''; record.exampleEn=record.exampleEn || reference.en || ''; record.exampleCn=record.exampleCn || reference.cn || ''; record.emoji=record.emoji || reference.emoji || getEmoji(record.meaning,word); record.hint=record.hint || reference.hint || ''; record.contentSource=reference.contentSource || '人工校对资料 v4'; }
+      if (!record.emoji && record.meaning) record.emoji=getEmoji(record.meaning,word); return record;
+    }
+    function looksLikeVocabularyLine(line) {
+      const term=String(line || '').trim(); if (!term || /[.!?。！？:：]/.test(term)) return false; const normalized=normalizeLookupTerm(term); if (referenceDataFor(normalized)) return true;
+      const words=normalized.split(' ').filter(Boolean); const sentenceWords=new Set(['i','we','you','he','she','it','they','this','that','there','was','were','is','are','am','will','would','can','could','should','have','has','had']);
+      return Boolean(words.length && words.length<=4 && !words.some(word=>sentenceWords.has(word)) && words.every(word=>/^[a-z][a-z'\-]*$/.test(word)));
+    }
+    /** 批量解析：保留词组、纠正常见拼写、拒绝把英文例句当成词条。 */
+    function parseBatchInput(text) {
+      const records=[]; const seen=new Set(); let current=null;
+      const add=(record)=>{ if (!record?.word) return; const key=normalizeLookupTerm(record.word); if (seen.has(key)) { const old=records.find(item=>item.word===key); if (old) for (const field of ['phonetic','meaning','exampleEn','exampleCn','emoji','hint']) if (!old[field] && record[field]) old[field]=record[field]; return; } record.word=key; seen.add(key); records.push(record); };
+      const flush=()=>{ if (current) add(current); current=null; };
+      const splitExample=(value)=>{ const input=String(value || ''); const match=input.match(/[\u3400-\u9fff]/); return match ? {en:input.slice(0,match.index).trim(),cn:input.slice(match.index).trim()} : {en:input.trim(),cn:''}; };
+      for (let raw of String(text || '').replace(/\r/g,'').split('\n')) {
+        raw=raw.replace(/^\s*(?:\d+[.)、]|[-•·▪︎])\s*/, '').trim(); if (!raw) continue;
+        if (/^例句\s*[:：]/.test(raw) && current) { const parsed=splitExample(raw.replace(/^例句\s*[:：]\s*/,'')); current.exampleEn=parsed.en; current.exampleCn=parsed.cn; continue; }
+        const formal=raw.match(/^([A-Za-z][A-Za-z'’\-]*(?:\s+[A-Za-z][A-Za-z'’\-]*)*)\s+(\/[^/]+\/)(?:\s+(.+))?$/);
+        if (formal) { flush(); const rest=formal[3] || ''; const marker=rest.search(/例句\s*[:：]/); const supplied={phonetic:formal[2],meaning:marker>=0?rest.slice(0,marker).trim():rest.trim()}; if (marker>=0) { const parsed=splitExample(rest.slice(marker).replace(/^例句\s*[:：]\s*/,'')); supplied.exampleEn=parsed.en; supplied.exampleCn=parsed.cn; } current=importRecordFor(formal[1],supplied); continue; }
+        const withChinese=raw.match(/^([A-Za-z][A-Za-z'’\-]*(?:\s+[A-Za-z][A-Za-z'’\-]*)*)\s+([^]*[\u3400-\u9fff][^]*)$/);
+        if (withChinese) { flush(); current=importRecordFor(withChinese[1],{meaning:withChinese[2].trim()}); continue; }
+        if (looksLikeVocabularyLine(raw)) { flush(); current=importRecordFor(raw); }
+      }
+      flush(); return records;
+    }
+
+    /** 从OCR原文中只保留词头行，过滤中文、界面按钮、例句和短杂讯。 */
+    function extractVocabularyFromOcr(rawText) {
+      const uiNoise=new Set(['online','preview','confirm','import','edit','delete','learn','learning','review','ready','status','upload','not studied','study','word','words','example','pronunciation','meaning','translation','mvp','xixi']);
+      const sentenceWords=new Set(['i','we','you','he','she','it','they','this','that','there','was','were','is','are','am','will','would','can','could','should','have','has','had']);
+      const known=[...Object.keys(CURATED_PET_WORDS),...Object.keys(STANDARD_PHRASE_EXAMPLES),...Object.keys(IMPORT_ALIASES)].sort((a,b)=>b.length-a.length);
+      const result=[]; const seen=new Set();
+      for (let rawLine of String(rawText || '').replace(/\r/g,'').split('\n')) {
+        rawLine=rawLine.replace(/^\s*(?:\d+[.)、]|[-•·▪︎])\s*/, '').trim(); if (!rawLine || !/[A-Za-z]/.test(rawLine)) continue;
+        const line=rawLine.toLowerCase().replace(/[’‘]/g,"'").replace(/[^a-z'\-\s]/g,' ').replace(/\s+/g,' ').trim(); if (!line || uiNoise.has(line)) continue;
+        let term=''; const exact=normalizeLookupTerm(line); if (referenceDataFor(exact)) term=exact;
+        if (!term) { const prefix=known.find(key=>line===key || line.startsWith(`${key} `)); if (prefix) { const rest=line.slice(prefix.length).trim(); if (!rest || uiNoise.has(rest) || /^(learning|ready|review|not studied|study)$/.test(rest)) term=normalizeLookupTerm(prefix); } }
+        if (!term) {
+          const words=line.split(' '); const sentence=/[.!?。！？:：]/.test(rawLine) || words.length>4 || words.some(word=>sentenceWords.has(word)); const valid=words.every(word=>/^[a-z][a-z'\-]*$/.test(word) && word.length<=24); const letters=words.join('').replace(/[^a-z]/g,'').length;
+          const strong=words.length===1 ? letters>=4 : words.every(word=>word.replace(/[^a-z]/g,'').length>=2) && letters>=6;
+          if (!sentence && valid && strong && !uiNoise.has(line)) term=line;
+        }
+        if (term && !seen.has(term)) { seen.add(term); result.push(term); }
+      }
+      return result;
+    }
+    /** 照片识别成功后直接生成完整预览；已有输入会保留并自动去重。 */
+    async function recognizeVocabularyPhoto(file) {
+      if (!file || !String(file.type || '').startsWith('image/')) { showToast('请选择一张图片'); return; }
+      if (!confirm('照片会上传到 OCR.Space 在线识别服务，仅用于本次文字识别。是否继续？')) return;
+      State.ocrStatus='正在识别照片…'; State.ocrRaw=''; State.ocrCandidates=[]; render();
+      try {
+        const form=new FormData(); form.append('file',file,file.name || 'vocabulary.jpg'); form.append('language','eng'); form.append('OCREngine','2'); form.append('isOverlayRequired','false'); form.append('scale','true'); form.append('detectOrientation','true');
+        const response=await fetchWithTimeout(OCR_API,{method:'POST',headers:{apikey:OCR_TEST_KEY},body:form},20000); if (!response.ok) throw new Error(`OCR ${response.status}`);
+        const payload=await response.json(); if (payload.IsErroredOnProcessing) throw new Error([].concat(payload.ErrorMessage || []).join(' ') || 'OCR处理失败');
+        const raw=(payload.ParsedResults || []).map(item=>item.ParsedText || '').join('\n'); const candidates=extractVocabularyFromOcr(raw); if (!candidates.length) throw new Error('没有识别到清晰词头');
+        State.ocrRaw=raw.trim(); State.ocrCandidates=candidates; State.batchText=[State.batchText.trim(),candidates.join('\n')].filter(Boolean).join('\n'); State.batchPreview=parseBatchInput(State.batchText); State.ocrStatus=`识别到 ${candidates.length} 个词语，已过滤例句和画面杂讯。`;
+        render(); const pending=State.batchPreview.filter(item=>missingBatchFields(item).length); if (pending.length) await lookupBatchOnline(); else showToast(`照片识别完成：${candidates.length} 个词语`);
+      } catch (error) { State.ocrStatus=error?.name==='AbortError'?'识别超时，请裁剪照片后重试。':'没有识别到清晰词语，请换一张正对、光线均匀的照片。'; render(); showToast(State.ocrStatus); }
+    }
+    function renderOcrResult() {
+      if (!State.ocrCandidates?.length && !State.ocrRaw) return '';
+      return `<div class="ocr-result"><strong>${escapeHtml(State.ocrStatus || '照片识别完成')}</strong>${State.ocrCandidates?.length?`<div class="ocr-chips">${State.ocrCandidates.map(word=>`<span class="ocr-chip">${escapeHtml(word)}</span>`).join('')}</div>`:''}${State.ocrRaw?`<details class="ocr-raw"><summary>查看识别原文（排错用）</summary><pre>${escapeHtml(State.ocrRaw)}</pre></details>`:''}</div>`;
+    }
+
+    /** 正式录入页：完整状态、资料来源、单条排除、图片和OCR结果同时可见。 */
+    function renderAdminAdd() {
+      const edit=State.editingWordId ? State.words.find(word=>word.id===State.editingWordId) : null;
+      const batchIndex=Number.isInteger(State.batchEditIndex)?State.batchEditIndex:null; const batchDraft=batchIndex!==null?State.batchPreview[batchIndex]:null; const draft=edit || batchDraft || {}; const image=imageDraftFor(draft);
+      const completeCount=State.batchPreview.filter(item=>!missingBatchFields(item).length).length; const incompleteCount=State.batchPreview.length-completeCount;
+      const preview=State.batchPreview.length?`<div class="preview-list" style="margin-top:15px">${State.batchPreview.map((item,index)=>{ const missing=missingBatchFields(item); const complete=!missing.length; return `<div class="preview-item"><div class="row between"><strong>${escapeHtml(item.emoji || getEmoji(item.meaning,item.word))} ${escapeHtml(item.word)}</strong><span class="badge ${complete?'green':'orange'}">${complete?'资料完整':'待补充'}</span></div>${item.correction?`<div class="tiny" style="margin-top:5px;color:var(--primary)">已纠正：${escapeHtml(item.correction)}</div>`:''}<div class="muted small" style="margin-top:5px">${escapeHtml(item.meaning || '中文释义待补充')}</div>${item.phonetic?`<div class="tiny" style="margin-top:5px">音标：${escapeHtml(item.phonetic)}</div>`:''}${item.exampleEn?`<div class="tiny" style="margin-top:5px">英文例句：${escapeHtml(item.exampleEn)}</div>`:''}${item.exampleCn?`<div class="tiny" style="margin-top:5px">中文翻译：${escapeHtml(item.exampleCn)}</div>`:''}${item.hint?`<div class="tiny" style="margin-top:5px">记忆提示：${escapeHtml(item.hint)}</div>`:''}<div class="tiny muted" style="margin-top:7px">资料：${escapeHtml(item.contentSource || '待核对')}</div>${missing.length?`<div class="tiny" style="margin-top:7px;color:var(--warning)">缺少：${escapeHtml(missing.join('、'))}</div>`:'<div class="tiny" style="margin-top:7px;color:var(--success)">可以录入</div>'}<div class="preview-actions">${missing.length?`<button class="mini-btn blue" data-action="edit-batch-item" data-index="${index}">补充</button>`:''}<button class="mini-btn red" data-action="remove-batch-item" data-index="${index}">不录入</button></div></div>`;}).join('')}</div>`:'';
+      const formTitle=edit?`编辑 ${escapeHtml(edit.word)}`:batchDraft?`补充 ${escapeHtml(batchDraft.word)}`:'手动录入'; const formButton=edit?'保存修改':batchDraft?'更新预览资料':'加入词库';
+      return `<div class="admin-layout"><div class="stack"><section class="card card-pad"><div class="eyebrow">当前录入单词本</div><h2 style="margin-top:7px">${escapeHtml(notebookName(State.batchNotebookId || State.activeNotebookId))}</h2>${notebookSelector('录入后归属单词本',State.batchNotebookId || State.activeNotebookId)}<p class="muted small" style="line-height:1.6;margin-top:10px">批量录入和拍照识别的词条会进入这个单词本。</p></section><section class="card card-pad"><div class="eyebrow">📷 拍照识别</div><h2 style="margin-top:7px">拍下英文词表</h2><p class="muted small" style="line-height:1.65;margin-top:9px">识别后只保留英文词头，自动过滤例句、中文和画面按钮。</p><label class="btn btn-primary btn-block" style="margin-top:15px">📷 拍照 / 选择图片<input type="file" accept="image/*" capture="environment" data-input="ocr-file" hidden></label><div class="tiny muted" data-ocr-status style="margin-top:11px">${escapeHtml(State.ocrStatus || '确认后照片会发送到 OCR.Space；本工具不保存原图。')}</div>${renderOcrResult()}</section><section class="card card-pad"><div class="row between"><div><div class="eyebrow">批量录入</div><h2 style="margin-top:7px">每行一个单词或词组</h2></div><span class="badge blue">本地优先</span></div><textarea class="textarea" style="margin-top:15px" data-input="batch-text" placeholder="a variety of\npublic transport\nsnowstorm\nchilly">${escapeHtml(State.batchText)}</textarea><div class="row wrap" style="margin-top:12px"><button class="btn btn-secondary" data-action="parse-batch">解析并预览</button>${State.batchPreview.length?`<button class="btn btn-primary" data-action="lookup-batch" ${State.batchLookupRunning?'disabled':''}>${State.batchLookupRunning?'补全中…':'🌐 补全未收录词'}</button><button class="btn btn-success" data-action="save-batch" ${State.batchLookupRunning || !completeCount?'disabled':''}>录入 ${completeCount} 个完整词</button>`:''}</div>${State.batchPreview.length?`<div class="tiny muted" data-online-status style="margin-top:10px">${incompleteCount?`已有 ${completeCount} 个完整；${incompleteCount} 个留在待补充区。`:'全部资料完整，可以确认录入。'}</div>`:''}${preview}</section></div><section class="card card-pad"><div class="eyebrow">${edit?'编辑单词':batchDraft?'批量词条补充':'逐条添加'}</div><h2 style="margin-top:7px">${formTitle}</h2><form id="wordForm" class="field-grid" style="margin-top:16px"><input type="hidden" name="id" value="${edit?.id || ''}"><label class="field"><span>英文单词或词组 *</span><input class="input" name="word" required value="${escapeHtml(draft.word || '')}" placeholder="例如 a variety of"></label>${notebookSelector('所属单词本',draft.notebookId || State.activeNotebookId).replace('data-input="active-notebook"','data-input="form-notebook"')}<div class="field-grid two"><label class="field"><span>音标</span><input class="input" name="phonetic" value="${escapeHtml(draft.phonetic || '')}" placeholder="自动补全"></label><label class="field"><span>中文释义</span><input class="input" name="meaning" value="${escapeHtml(draft.meaning || '')}" placeholder="自动补全"></label></div><label class="field"><span>英文例句</span><textarea class="textarea" style="min-height:90px" name="exampleEn" placeholder="自动补全真实例句">${escapeHtml(draft.exampleEn || '')}</textarea></label><label class="field"><span>中文翻译</span><input class="input" name="exampleCn" value="${escapeHtml(draft.exampleCn || '')}" placeholder="自动翻译"></label><label class="field"><span>图片链接（可选）</span><input class="input" name="imageUrl" data-input="word-image-url" value="${escapeHtml(image)}" placeholder="粘贴图片链接 https://..."></label>${renderImagePicker(draft)}<div class="field-grid two"><label class="field"><span>Emoji 兜底</span><input class="input" name="emoji" value="${escapeHtml(draft.emoji || '')}" placeholder="自动匹配"></label><label class="field"><span>记忆提示</span><textarea class="textarea" style="min-height:80px" name="hint" placeholder="词根拆解或联想故事">${escapeHtml(draft.hint || '')}</textarea></label></div><div class="row wrap"><button class="btn btn-secondary" type="button" data-action="lookup-form">🌐 在线补全</button><button class="btn btn-primary" type="submit">${formButton}</button>${(edit || batchDraft)?'<button class="btn btn-secondary" type="button" data-action="cancel-edit">取消</button>':''}</div></form></section></div>`;
+    }
+    document.addEventListener('click',(event)=>{ const target=event.target.closest('[data-action]'); if (!target || target.dataset.action!=='remove-batch-item') return; event.preventDefault(); event.stopPropagation(); const index=Number(target.dataset.index); State.batchPreview.splice(index,1); State.batchText=State.batchPreview.map(item=>item.word).join('\n'); if (State.batchEditIndex===index) State.batchEditIndex=null; render(); showToast('已从本次录入中移除'); },true);
+
+    /** 只保存资料完整的条目；残缺条目留在预览，已有词补资料但保留学习进度。 */
+    async function saveBatch() {
+      const items=State.batchPreview; if (!items.length || State.batchLookupRunning) return;
+      const pending=items.filter(item=>missingBatchFields(item).length); if (pending.length) await mapOnlineWithConcurrency(pending,item=>lookupWordOnline(item),6);
+      const ready=items.filter(item=>!missingBatchFields(item).length); const incomplete=items.filter(item=>missingBatchFields(item).length);
+      if (!ready.length) { State.batchPreview=items; render(); showToast('还没有资料完整的词，请按提示补充。'); return; }
+      const bookId=Number(State.batchNotebookId || State.activeNotebookId); const existingByWord=new Map(State.words.map(word=>[normalizeLookupTerm(word.word),word])); let added=0,updated=0;
+      for (const raw of ready) {
+        const item={...raw,word:normalizeLookupTerm(raw.word)}; if (!item.emoji || item.emoji===EMOJI_MAP.default) item.emoji=getEmoji(item.meaning,item.word); const existing=existingByWord.get(item.word);
+        if (existing) { await DB.put('words',{...existing,phonetic:item.phonetic,meaning:item.meaning,exampleEn:item.exampleEn,exampleCn:item.exampleCn,emoji:item.emoji,hint:item.hint || existing.hint || '',imageUrl:item.imageUrl || existing.imageUrl || '',imageSource:item.imageSource || existing.imageSource || '',imageTitle:item.imageTitle || existing.imageTitle || '',contentSource:item.contentSource || existing.contentSource || ''}); updated++; }
+        else { await DB.put('words',{...item,notebookId:bookId,status:'new',reviewCount:0,lastReview:0,nextReview:0,errorCount:0,createdAt:Date.now()+added}); added++; }
+      }
+      State.words=await DB.all('words'); State.batchPreview=incomplete; State.batchText=incomplete.map(item=>item.word).join('\n'); State.batchEditIndex=null; await ensureDailyLog(); render();
+      const saved=[added?`新增 ${added} 个`:'',updated?`补齐 ${updated} 个已有词`:''].filter(Boolean).join('，'); showToast(`${saved}${incomplete.length?`；${incomplete.length} 个待补充`:''}`);
+    }
+    async function saveWordForm(form) {
+      const data=Object.fromEntries(new FormData(form).entries()); const batchIndex=Number.isInteger(State.batchEditIndex)?State.batchEditIndex:null; const existing=data.id?State.words.find(word=>word.id===Number(data.id)):null; const base=batchIndex!==null?State.batchPreview[batchIndex]:existing; const typed=String(data.word || '').trim(); if (!typed) { showToast('请先填写英文单词或词组'); return; }
+      const referenceRecord=importRecordFor(typed); const next={...(base || {status:'new',reviewCount:0,lastReview:0,nextReview:0,errorCount:0,createdAt:Date.now()}),...referenceRecord,word:normalizeLookupTerm(typed),notebookId:Number(data.notebookId || State.batchNotebookId || State.activeNotebookId),phonetic:String(data.phonetic || '').trim() || referenceRecord.phonetic,meaning:String(data.meaning || '').trim() || referenceRecord.meaning,exampleEn:String(data.exampleEn || '').trim() || referenceRecord.exampleEn,exampleCn:String(data.exampleCn || '').trim() || referenceRecord.exampleCn,imageUrl:State.wordImageDraft!==null?State.wordImageDraft:String(data.imageUrl || '').trim(),imageSource:State.wordImageSource!==null?State.wordImageSource:String(base?.imageSource || ''),imageTitle:State.wordImageTitle || String(base?.imageTitle || ''),emoji:String(data.emoji || '').trim() || referenceRecord.emoji,hint:String(data.hint || '').trim() || referenceRecord.hint};
+      if (missingBatchFields(next).length) await lookupWordOnline(next); if (!next.emoji || next.emoji===EMOJI_MAP.default) next.emoji=getEmoji(next.meaning,next.word); const missing=missingBatchFields(next);
+      if (missing.length) { if (batchIndex!==null) State.batchPreview[batchIndex]=next; render(); showToast('仍缺少：'+missing.join('、')); return; }
+      if (batchIndex!==null) { State.batchPreview[batchIndex]=next; State.batchEditIndex=null; State.wordImageDraft=null; render(); showToast('这条资料已补充完整'); return; }
+      const duplicate=State.words.find(word=>normalizeLookupTerm(word.word)===next.word && word.id!==next.id); if (duplicate) { showToast('词库里已经有这个单词啦'); return; }
+      await DB.put('words',next); State.words=await DB.all('words'); State.editingWordId=null; State.wordImageDraft=null; State.wordImageSource=null; State.wordImageTitle=''; State.imageStatus=''; await ensureDailyLog(); showToast(existing?'单词已更新':'单词已加入词库'); render();
+    }
+    /** 一次性修复已知旧词资料，保留学习状态、次数、希币、图片和所属单词本。 */
+    async function cleanStoredWordData(words) {
+      const forceCurated=localStorage.getItem('petImportEngineRepairV4')!=='true'; const result=[];
+      for (const word of words || []) {
+        const next={...word}; const reference=referenceDataFor(next.word); let changed=false;
+        if (reference && forceCurated) { for (const [field,value] of [['phonetic',reference.phonetic],['meaning',reference.meaning],['exampleEn',reference.en],['exampleCn',reference.cn],['hint',reference.hint]]) if (value && next[field]!==value) { next[field]=value; changed=true; } next.contentSource=reference.contentSource || '人工校对资料 v4'; }
+        else if (reference) { if (!String(next.phonetic || '').trim()) { next.phonetic=reference.phonetic; changed=true; } if (!isUsableMeaning(next.meaning)) { next.meaning=reference.meaning; changed=true; } if (!isUsableEnglishExample(next.exampleEn)) { next.exampleEn=reference.en; changed=true; } if (!isUsableChineseExample(next.exampleCn)) { next.exampleCn=reference.cn; changed=true; } if (!next.hint && reference.hint) { next.hint=reference.hint; changed=true; } }
+        const emoji=reference?.emoji || getEmoji(next.meaning,next.word); if (!next.emoji || next.emoji===EMOJI_MAP.default) { next.emoji=emoji; changed=true; } if (changed && next.id!==undefined) await DB.put('words',next); result.push(next);
+      }
+      if (forceCurated) localStorage.setItem('petImportEngineRepairV4','true'); return result;
+    }
+    /** 只联网查询仍缺资料的词；本地完整词不会重复请求，也不会显示失败提示。 */
+    async function lookupBatchOnline() {
+      if (!State.batchPreview.length || State.batchLookupRunning) return;
+      const pending=State.batchPreview.filter(item=>missingBatchFields(item).length);
+      if (!pending.length) { showToast('本地校对资料已经完整，可以直接录入'); return; }
+      State.batchLookupRunning=true; render(); let completed=0,filled=0;
+      try {
+        await mapOnlineWithConcurrency(pending,async item=>{ const before=missingBatchFields(item).length; await lookupWordOnline(item); if (missingBatchFields(item).length<before) filled++; completed++; const status=$('[data-online-status]'); if (status) status.textContent=`正在补全 ${completed}/${pending.length}…`; },6);
+        render(); showToast(filled?`在线补全完成：更新了 ${filled} 个词`:'未收录词仍需手动核对，不影响其他词录入');
+      } catch (_) { showToast('在线补全暂时失败，完整词仍可正常录入'); }
+      finally { State.batchLookupRunning=false; render(); }
+    }
+    /**
+     * 选择题只使用简洁中文释义，并按去标点后的文本去重。
+     * 例如“住处；住宿”和“住处，住宿”属于同一个答案，不能同时出现。
+     */
+    function normalizeMeaningChoice(value) {
+      return String(value || '')
+        .toLowerCase()
+        .replace(/[\s,，;；、。.！!？?：:（）()\[\]【】“”'‘’]/g, '');
+    }
+    function isUsableQuizMeaning(value) {
+      const text=String(value || '').trim();
+      const chinese=(text.match(/[\u3400-\u9fff]/g) || []).length;
+      return chinese >= 1 && !looksLikeBadMeaning(text) && text.length <= 32;
+    }
+    function makeQuiz(word) {
+      const answer=quizMeaning(word);
+      const answerKey=normalizeMeaningChoice(answer);
+      const fallback=['广告','挑战','贡献','庆祝','机会','环境','决定','旅行'];
+      const pool=shuffle([
+        ...State.words.filter(item=>item.id!==word.id).map(item=>quizMeaning(item)),
+        ...fallback
+      ]);
+      const choices=[answer];
+      const seen=new Set([answerKey]);
+      for (const choice of pool) {
+        const key=normalizeMeaningChoice(choice);
+        if (!key || seen.has(key) || !isUsableQuizMeaning(choice)) continue;
+        seen.add(key);
+        choices.push(String(choice).trim());
+        if (choices.length===4) break;
+      }
+      return shuffle(choices);
+    }
+    window.__XIXI_IMPORT_ENGINE__={version:IMPORT_ENGINE_VERSION,parseBatchInput,extractVocabularyFromOcr,missingBatchFields,referenceDataFor};
 
     init();
   </script>
