@@ -90,6 +90,9 @@
     .task-status.pending { background: rgba(255,149,0,.14); color: #c26d00; }
     .task-status.lock { background: rgba(142,142,147,.13); color: var(--text-secondary); }
     .btn { min-height: 46px; padding: 11px 17px; border-radius: 13px; font-weight: 750; font-size: 16px; transition: transform .15s ease, box-shadow .15s ease, background .15s ease; display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+    /* iOS Safari 对 display:none/hidden 的文件输入支持不稳定；让透明输入框直接覆盖按钮。 */
+    .file-input-label { position: relative; overflow: hidden; cursor: pointer; }
+    .file-input-label input[type="file"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .001; cursor: pointer; font-size: 100px; }
     .btn:active { transform: scale(.96); }
     .btn-primary { color: #fff; background: var(--primary); box-shadow: 0 8px 16px rgba(0,122,255,.20); }
     .btn-primary:hover { background: var(--primary-dark); }
@@ -414,7 +417,7 @@
       route: '/learn', currentUser: 'child', today: todayKey(), settings: { ...DEFAULT_SETTINGS }, words: [], logs: [], notebooks: [], activeNotebookId: null, legacyWordsPresent: false,
       currentTask: null, guidePage: 0, showGuide: false, stageAReadyAt: 0, stageAFlipped: false, stageB: null, spell: null, weeklyTest: null,
       adminTab: 'overview', adminLoggedIn: false, adminSearch: '', adminPage: 1, editingWordId: null, batchPreview: [], importPayload: null,
-      wordSearch: '', batchText: '', batchLookupRunning: false, batchEditIndex: null, ocrStatus: '', selectedWordId: null, toastTimer: null, wordImageDraft: null, wordImageSource: null, wordImageTitle: '', imageStatus: '', notebookSearch: '', notebookEditingId: null
+      wordSearch: '', batchText: '', batchLookupRunning: false, batchEditIndex: null, batchSaveSummary: null, ocrStatus: '', selectedWordId: null, toastTimer: null, wordImageDraft: null, wordImageSource: null, wordImageTitle: '', imageStatus: '', notebookSearch: '', notebookEditingId: null
     };
 
     /** 读取本地数据，并在首次启动时写入示例词。 */
@@ -513,7 +516,8 @@
     /** 将相机或相册图片缩小后保存，避免原图过大导致本机词库超出存储空间。 */
     function prepareWordImage(file) {
       return new Promise((resolve, reject) => {
-        if (!file || !String(file.type || '').startsWith('image/')) { reject(new Error('请选择图片文件')); return; }
+        const looksLikeImage = file && (!file.type || String(file.type).startsWith('image/') || /\.(?:jpe?g|png|webp|heic|heif)$/i.test(file.name || ''));
+        if (!looksLikeImage) { reject(new Error('请选择图片文件')); return; }
         const reader = new FileReader();
         reader.onerror = () => reject(new Error('图片读取失败'));
         reader.onload = () => {
@@ -533,7 +537,7 @@
     }
     function renderImagePicker(edit) {
       const image = imageDraftFor(edit); const source = State.wordImageSource !== null ? State.wordImageSource : (edit?.imageSource || ''); const preview = image ? `<img src="${escapeHtml(image)}" alt="图片预览" onerror="this.style.display='none'">` : '<div class="word-emoji" style="flex:0 0 auto">🖼️</div>';
-      return `<div class="image-picker" data-image-picker><div class="image-picker-preview">${preview}<div><strong>${image ? '已添加学习图片' : '还没有学习图片'}</strong><div class="muted tiny" style="margin-top:4px">${image ? '学习卡会优先显示这张图片。' : '可以用 iPad 拍照、从相册选择，或填写图片链接。'}</div>${source ? `<a class="tiny" style="display:inline-block;margin-top:5px;color:var(--primary)" href="${escapeHtml(source)}" target="_blank" rel="noopener">图片来源</a>` : ''}</div></div><div class="row wrap"><label class="btn btn-secondary">📷 上传图片<input type="file" accept="image/*" data-input="word-image-file" hidden></label><button class="btn btn-secondary" type="button" data-action="find-word-image">🌐 自动找图片</button>${image ? '<button class="btn btn-ghost" type="button" data-action="clear-word-image">移除图片</button>' : ''}</div><div class="tiny muted" data-image-status>${escapeHtml(State.imageStatus || '建议给每个单词配一张清晰图片；未添加时会使用 Emoji。')}</div></div>`;
+      return `<div class="image-picker" data-image-picker><div class="image-picker-preview">${preview}<div><strong>${image ? '已添加学习图片' : '还没有学习图片'}</strong><div class="muted tiny" style="margin-top:4px">${image ? '学习卡会优先显示这张图片。' : '可以用 iPad 拍照、从相册选择，或填写图片链接。'}</div>${source ? `<a class="tiny" style="display:inline-block;margin-top:5px;color:var(--primary)" href="${escapeHtml(source)}" target="_blank" rel="noopener">图片来源</a>` : ''}</div></div><div class="row wrap"><label class="btn btn-secondary file-input-label">📷 上传图片<input type="file" accept="image/*,.heic,.heif" data-input="word-image-file" aria-label="选择学习图片"></label><button class="btn btn-secondary" type="button" data-action="find-word-image">🌐 自动找图片</button>${image ? '<button class="btn btn-ghost" type="button" data-action="clear-word-image">移除图片</button>' : ''}</div><div class="tiny muted" data-image-status>${escapeHtml(State.imageStatus || '建议给每个单词配一张清晰图片；未添加时会使用 Emoji。')}</div></div>`;
     }
     function refreshImagePicker() { const picker = $('[data-image-picker]'); if (picker) picker.outerHTML = renderImagePicker(State.editingWordId ? State.words.find(word => word.id === State.editingWordId) : null); }
     /** 从 Wikimedia Commons 查找一张可公开访问的图片；用户点击后才联网查询。 */
@@ -1544,7 +1548,7 @@
       if (!State.notebooks.some(book => book.id === nextId)) return;
       if (State.currentTask && !confirm('切换单词本会退出当前学习，已经完成的内容会保留。要切换吗？')) { render(); return; }
       State.currentTask = null; State.stageB = null; State.spell = null; State.weeklyTest = null;
-      State.activeNotebookId = nextId; State.settings.activeNotebookId = nextId; State.batchNotebookId = nextId;
+      State.activeNotebookId = nextId; State.settings.activeNotebookId = nextId; State.batchNotebookId = nextId; State.batchSaveSummary = null;
       await DB.put('settings', State.settings); await ensureDailyLog(); render();
       showToast('已切换到“' + notebookName(nextId) + '”');
     }
@@ -1744,7 +1748,7 @@
     }, true);
     /* 解析后固定这批词的归属，避免用户切换单词本时误放位置。 */
     document.addEventListener('click', (event) => {
-      const target = event.target.closest('[data-action="parse-batch"]'); if (!target) return; State.batchNotebookId = Number(State.activeNotebookId);
+      const target = event.target.closest('[data-action="parse-batch"]'); if (!target) return; State.batchNotebookId = Number(State.activeNotebookId); State.batchSaveSummary = null;
     }, true);
 
     /** 空单词本不能显示“已完成”；只有确实存在今日任务时才显示完成状态。 */
@@ -2048,7 +2052,11 @@
       environment: { phonetic:'/ɪnˈvaɪrənmənt/', meaning:'环境', en:'We should all help to protect the environment.', cn:'我们都应该帮助保护环境。', emoji:'🌍' },
       luggage: { phonetic:'/ˈlʌɡɪdʒ/', meaning:'行李', en:'Please leave your luggage beside the door.', cn:'请把行李放在门旁边。', emoji:'🧳' },
       volunteer: { phonetic:'/ˌvɒlənˈtɪə(r)/', meaning:'志愿者；自愿做', en:'She works as a volunteer at the animal centre.', cn:'她在动物中心做志愿者。', emoji:'🙋' },
-      improve: { phonetic:'/ɪmˈpruːv/', meaning:'改善；提高', en:'Reading every day can improve your English.', cn:'每天阅读可以提高你的英语水平。', emoji:'📈' }
+      improve: { phonetic:'/ɪmˈpruːv/', meaning:'改善；提高', en:'Reading every day can improve your English.', cn:'每天阅读可以提高你的英语水平。', emoji:'📈' },
+      rumble: { phonetic:'/ˈrʌmbl/', meaning:'隆隆声；发出隆隆声', en:'We heard the rumble of thunder in the distance.', cn:'我们听到远处隆隆的雷声。', emoji:'🌩️' },
+      blizzard: { phonetic:'/ˈblɪzəd/', meaning:'暴风雪', en:'The roads were closed because of the blizzard.', cn:'由于暴风雪，道路被封闭了。', emoji:'🌨️' },
+      nippy: { phonetic:'/ˈnɪpi/', meaning:'寒冷的；冷飕飕的', en:'It was a nippy morning, so I wore a warm scarf.', cn:'早晨冷飕飕的，所以我戴上了暖和的围巾。', emoji:'🥶' },
+      flash: { phonetic:'/flæʃ/', meaning:'闪光；闪现', en:'A flash of lightning lit up the sky.', cn:'一道闪电照亮了天空。', emoji:'⚡' }
     });
     const IMPORT_HINTS = {
       accommodation:'ac-（朝向）+ commod（方便）+ -ation（名词后缀）→ 住处', advertisement:'让目光转向它 → 广告', celebrate:'想象大家一起举起彩带庆祝',
@@ -2058,7 +2066,8 @@
       storm:'大风大雨一起袭来', warm:'双手靠近暖暖的太阳', cool:'傍晚微风带来凉爽', cold:'冷了要穿 coat', misty:'mist（薄雾）+ -y', drizzle:'比 rain 更轻的小雨', rainbow:'rain（雨）+ bow（弓）', breeze:'树叶轻轻动的微风',
       humid:'空气里像有很多小水滴', temperature:'看到温度计就想到 temperature', 'public transport':'public（公共的）+ transport（交通）', 'a variety of':'variety 表示“多样”',
       'look after':'在后面看着、照料某人', 'take part in':'成为其中一部分 → 参加', 'get on with':'一起顺利向前走 → 相处融洽', 'be interested in':'interested 后面常跟 in', 'at least':'least 是“最少”',
-      environment:'想象地球周围的一切环境', journey:'提着行李开始旅程', luggage:'旅行时拖着走的行李', volunteer:'主动举手帮助别人', improve:'成绩箭头向上 → 提高'
+      environment:'想象地球周围的一切环境', journey:'提着行李开始旅程', luggage:'旅行时拖着走的行李', volunteer:'主动举手帮助别人', improve:'成绩箭头向上 → 提高',
+      rumble:'想象远处雷声轰隆隆滚过来', blizzard:'强风卷着大雪 → 暴风雪', nippy:'冷得像被轻轻咬了一口', flash:'一道很快出现的亮光'
     };
     for (const [word, data] of Object.entries(CURATED_PET_WORDS)) { data.hint = data.hint || IMPORT_HINTS[word] || ''; data.contentSource = '人工校对资料 v4'; }
     for (const [word, data] of Object.entries(STANDARD_PHRASE_EXAMPLES)) { data.hint = data.hint || IMPORT_HINTS[IMPORT_ALIASES[word] || word] || ''; data.emoji = data.emoji || getEmoji(data.meaning, word); data.contentSource = '人工校对资料 v4'; }
@@ -2117,19 +2126,71 @@
       }
       return result;
     }
+    /** 判断移动设备返回的文件是否是可处理的照片；部分 iOS 版本不会填写 MIME 类型。 */
+    function isOcrImageFile(file) {
+      return Boolean(file && (
+        !String(file.type || '').trim() ||
+        String(file.type).startsWith('image/') ||
+        /\.(?:jpe?g|png|webp|heic|heif)$/i.test(file.name || '')
+      ));
+    }
+    /** 用浏览器原生解码器打开相册照片，兼容 iPhone/iPad 选择的 HEIC。 */
+    async function decodeMobilePhoto(file) {
+      if (typeof createImageBitmap === 'function') {
+        try { return await createImageBitmap(file, { imageOrientation:'from-image' }); } catch (_) {}
+      }
+      return new Promise((resolve, reject) => {
+        const url=URL.createObjectURL(file); const image=new Image();
+        image.onload=()=>{ URL.revokeObjectURL(url); resolve(image); };
+        image.onerror=()=>{ URL.revokeObjectURL(url); reject(new Error('PHOTO_DECODE_FAILED')); };
+        image.src=url;
+      });
+    }
+    function canvasJpegBlob(canvas, quality) {
+      return new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('PHOTO_CONVERT_FAILED')), 'image/jpeg', quality));
+    }
+    /**
+     * OCR.Space 免费接口限制单张 1MB。手机照片先缩放并转换为 JPEG，
+     * 避免 iOS 的 HEIC、4K 原图和多兆文件直接上传失败。
+     */
+    async function prepareOcrUpload(file) {
+      if (!isOcrImageFile(file)) throw new Error('NOT_IMAGE');
+      const source=await decodeMobilePhoto(file);
+      const sourceWidth=source.naturalWidth || source.width; const sourceHeight=source.naturalHeight || source.height;
+      if (!sourceWidth || !sourceHeight) throw new Error('PHOTO_DECODE_FAILED');
+      let maxSide=1900; let scale=Math.min(1,maxSide/Math.max(sourceWidth,sourceHeight));
+      let width=Math.max(1,Math.round(sourceWidth*scale)); let height=Math.max(1,Math.round(sourceHeight*scale));
+      const draw=(w,h)=>{ const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h; const context=canvas.getContext('2d',{alpha:false}); context.fillStyle='#fff'; context.fillRect(0,0,w,h); context.drawImage(source,0,0,w,h); return canvas; };
+      let canvas=draw(width,height); let blob=await canvasJpegBlob(canvas,.84);
+      if (blob.size>880*1024) blob=await canvasJpegBlob(canvas,.68);
+      if (blob.size>880*1024) {
+        const shrink=Math.min(.88,Math.sqrt((820*1024)/blob.size)); width=Math.max(1,Math.round(width*shrink)); height=Math.max(1,Math.round(height*shrink));
+        canvas=draw(width,height); blob=await canvasJpegBlob(canvas,.7);
+      }
+      if (typeof source.close==='function') source.close();
+      if (blob.size>1024*1024) throw new Error('PHOTO_TOO_LARGE');
+      return typeof File==='function' ? new File([blob], 'xixi-ocr.jpg', { type:'image/jpeg', lastModified:Date.now() }) : blob;
+    }
     /** 照片识别成功后直接生成完整预览；已有输入会保留并自动去重。 */
     async function recognizeVocabularyPhoto(file) {
-      if (!file || !String(file.type || '').startsWith('image/')) { showToast('请选择一张图片'); return; }
+      if (!isOcrImageFile(file)) { showToast('请选择一张图片'); return; }
       if (!confirm('照片会上传到 OCR.Space 在线识别服务，仅用于本次文字识别。是否继续？')) return;
-      State.ocrStatus='正在识别照片…'; State.ocrRaw=''; State.ocrCandidates=[]; render();
+      State.ocrStatus='正在优化手机照片…'; State.ocrRaw=''; State.ocrCandidates=[]; State.batchSaveSummary=null; render();
       try {
-        const form=new FormData(); form.append('file',file,file.name || 'vocabulary.jpg'); form.append('language','eng'); form.append('OCREngine','2'); form.append('isOverlayRequired','false'); form.append('scale','true'); form.append('detectOrientation','true');
-        const response=await fetchWithTimeout(OCR_API,{method:'POST',headers:{apikey:OCR_TEST_KEY},body:form},20000); if (!response.ok) throw new Error(`OCR ${response.status}`);
+        const upload=await prepareOcrUpload(file); State.ocrStatus=`正在上传识别（${Math.max(1,Math.round(upload.size/1024))}KB）…`; render();
+        const form=new FormData(); form.append('file',upload,'xixi-ocr.jpg'); form.append('language','eng'); form.append('OCREngine','2'); form.append('isOverlayRequired','false'); form.append('scale','true'); form.append('detectOrientation','true');
+        const response=await fetchWithTimeout(OCR_API,{method:'POST',headers:{apikey:OCR_TEST_KEY},body:form},30000); if (!response.ok) throw new Error(`OCR_${response.status}`);
         const payload=await response.json(); if (payload.IsErroredOnProcessing) throw new Error([].concat(payload.ErrorMessage || []).join(' ') || 'OCR处理失败');
         const raw=(payload.ParsedResults || []).map(item=>item.ParsedText || '').join('\n'); const candidates=extractVocabularyFromOcr(raw); if (!candidates.length) throw new Error('没有识别到清晰词头');
         State.ocrRaw=raw.trim(); State.ocrCandidates=candidates; State.batchText=[State.batchText.trim(),candidates.join('\n')].filter(Boolean).join('\n'); State.batchPreview=parseBatchInput(State.batchText); State.ocrStatus=`识别到 ${candidates.length} 个词语，已过滤例句和画面杂讯。`;
         render(); const pending=State.batchPreview.filter(item=>missingBatchFields(item).length); if (pending.length) await lookupBatchOnline(); else showToast(`照片识别完成：${candidates.length} 个词语`);
-      } catch (error) { State.ocrStatus=error?.name==='AbortError'?'识别超时，请裁剪照片后重试。':'没有识别到清晰词语，请换一张正对、光线均匀的照片。'; render(); showToast(State.ocrStatus); }
+      } catch (error) {
+        if (error?.name==='AbortError') State.ocrStatus='识别超时，请检查网络后重试。';
+        else if (/PHOTO_DECODE_FAILED|PHOTO_CONVERT_FAILED/.test(error?.message || '')) State.ocrStatus='这张照片无法读取。请先在相册中截屏，再选择截屏图片。';
+        else if (/PHOTO_TOO_LARGE/.test(error?.message || '')) State.ocrStatus='照片仍然太大，请先裁剪到词表区域再重试。';
+        else State.ocrStatus=`识别失败：${String(error?.message || '请换一张正对、清晰的词表照片').replace(/^OCR_/,'服务返回 ')}`;
+        render(); showToast(State.ocrStatus);
+      }
     }
     function renderOcrResult() {
       if (!State.ocrCandidates?.length && !State.ocrRaw) return '';
@@ -2141,26 +2202,36 @@
       const edit=State.editingWordId ? State.words.find(word=>word.id===State.editingWordId) : null;
       const batchIndex=Number.isInteger(State.batchEditIndex)?State.batchEditIndex:null; const batchDraft=batchIndex!==null?State.batchPreview[batchIndex]:null; const draft=edit || batchDraft || {}; const image=imageDraftFor(draft);
       const completeCount=State.batchPreview.filter(item=>!missingBatchFields(item).length).length; const incompleteCount=State.batchPreview.length-completeCount;
+      const savedSummary=State.batchSaveSummary?`<div class="notice" style="margin-top:13px;border-color:${State.batchSaveSummary.type==='error'?'#ffb4ae':'#8ed9a4'};background:${State.batchSaveSummary.type==='error'?'#fff3f2':'#effcf3'}"><strong>${escapeHtml(State.batchSaveSummary.message)}</strong>${State.batchSaveSummary.type==='success'?'<button class="mini-btn blue" style="margin-left:10px" data-action="navigate" data-path="/words">去词库查看 →</button>':''}</div>`:'';
       const preview=State.batchPreview.length?`<div class="preview-list" style="margin-top:15px">${State.batchPreview.map((item,index)=>{ const missing=missingBatchFields(item); const complete=!missing.length; return `<div class="preview-item"><div class="row between"><strong>${escapeHtml(item.emoji || getEmoji(item.meaning,item.word))} ${escapeHtml(item.word)}</strong><span class="badge ${complete?'green':'orange'}">${complete?'资料完整':'待补充'}</span></div>${item.correction?`<div class="tiny" style="margin-top:5px;color:var(--primary)">已纠正：${escapeHtml(item.correction)}</div>`:''}<div class="muted small" style="margin-top:5px">${escapeHtml(item.meaning || '中文释义待补充')}</div>${item.phonetic?`<div class="tiny" style="margin-top:5px">音标：${escapeHtml(item.phonetic)}</div>`:''}${item.exampleEn?`<div class="tiny" style="margin-top:5px">英文例句：${escapeHtml(item.exampleEn)}</div>`:''}${item.exampleCn?`<div class="tiny" style="margin-top:5px">中文翻译：${escapeHtml(item.exampleCn)}</div>`:''}${item.hint?`<div class="tiny" style="margin-top:5px">记忆提示：${escapeHtml(item.hint)}</div>`:''}<div class="tiny muted" style="margin-top:7px">资料：${escapeHtml(item.contentSource || '待核对')}</div>${missing.length?`<div class="tiny" style="margin-top:7px;color:var(--warning)">缺少：${escapeHtml(missing.join('、'))}</div>`:'<div class="tiny" style="margin-top:7px;color:var(--success)">可以录入</div>'}<div class="preview-actions">${missing.length?`<button class="mini-btn blue" data-action="edit-batch-item" data-index="${index}">补充</button>`:''}<button class="mini-btn red" data-action="remove-batch-item" data-index="${index}">不录入</button></div></div>`;}).join('')}</div>`:'';
       const formTitle=edit?`编辑 ${escapeHtml(edit.word)}`:batchDraft?`补充 ${escapeHtml(batchDraft.word)}`:'手动录入'; const formButton=edit?'保存修改':batchDraft?'更新预览资料':'加入词库';
-      return `<div class="admin-layout"><div class="stack"><section class="card card-pad"><div class="eyebrow">当前录入单词本</div><h2 style="margin-top:7px">${escapeHtml(notebookName(State.batchNotebookId || State.activeNotebookId))}</h2>${notebookSelector('录入后归属单词本',State.batchNotebookId || State.activeNotebookId)}<p class="muted small" style="line-height:1.6;margin-top:10px">批量录入和拍照识别的词条会进入这个单词本。</p></section><section class="card card-pad"><div class="eyebrow">📷 拍照识别</div><h2 style="margin-top:7px">拍下英文词表</h2><p class="muted small" style="line-height:1.65;margin-top:9px">识别后只保留英文词头，自动过滤例句、中文和画面按钮。</p><label class="btn btn-primary btn-block" style="margin-top:15px">📷 拍照 / 选择图片<input type="file" accept="image/*" capture="environment" data-input="ocr-file" hidden></label><div class="tiny muted" data-ocr-status style="margin-top:11px">${escapeHtml(State.ocrStatus || '确认后照片会发送到 OCR.Space；本工具不保存原图。')}</div>${renderOcrResult()}</section><section class="card card-pad"><div class="row between"><div><div class="eyebrow">批量录入</div><h2 style="margin-top:7px">每行一个单词或词组</h2></div><span class="badge blue">本地优先</span></div><textarea class="textarea" style="margin-top:15px" data-input="batch-text" placeholder="a variety of\npublic transport\nsnowstorm\nchilly">${escapeHtml(State.batchText)}</textarea><div class="row wrap" style="margin-top:12px"><button class="btn btn-secondary" data-action="parse-batch">解析并预览</button>${State.batchPreview.length?`<button class="btn btn-primary" data-action="lookup-batch" ${State.batchLookupRunning?'disabled':''}>${State.batchLookupRunning?'补全中…':'🌐 补全未收录词'}</button><button class="btn btn-success" data-action="save-batch" ${State.batchLookupRunning || !completeCount?'disabled':''}>录入 ${completeCount} 个完整词</button>`:''}</div>${State.batchPreview.length?`<div class="tiny muted" data-online-status style="margin-top:10px">${incompleteCount?`已有 ${completeCount} 个完整；${incompleteCount} 个留在待补充区。`:'全部资料完整，可以确认录入。'}</div>`:''}${preview}</section></div><section class="card card-pad"><div class="eyebrow">${edit?'编辑单词':batchDraft?'批量词条补充':'逐条添加'}</div><h2 style="margin-top:7px">${formTitle}</h2><form id="wordForm" class="field-grid" style="margin-top:16px"><input type="hidden" name="id" value="${edit?.id || ''}"><label class="field"><span>英文单词或词组 *</span><input class="input" name="word" required value="${escapeHtml(draft.word || '')}" placeholder="例如 a variety of"></label>${notebookSelector('所属单词本',draft.notebookId || State.activeNotebookId).replace('data-input="active-notebook"','data-input="form-notebook"')}<div class="field-grid two"><label class="field"><span>音标</span><input class="input" name="phonetic" value="${escapeHtml(draft.phonetic || '')}" placeholder="自动补全"></label><label class="field"><span>中文释义</span><input class="input" name="meaning" value="${escapeHtml(draft.meaning || '')}" placeholder="自动补全"></label></div><label class="field"><span>英文例句</span><textarea class="textarea" style="min-height:90px" name="exampleEn" placeholder="自动补全真实例句">${escapeHtml(draft.exampleEn || '')}</textarea></label><label class="field"><span>中文翻译</span><input class="input" name="exampleCn" value="${escapeHtml(draft.exampleCn || '')}" placeholder="自动翻译"></label><label class="field"><span>图片链接（可选）</span><input class="input" name="imageUrl" data-input="word-image-url" value="${escapeHtml(image)}" placeholder="粘贴图片链接 https://..."></label>${renderImagePicker(draft)}<div class="field-grid two"><label class="field"><span>Emoji 兜底</span><input class="input" name="emoji" value="${escapeHtml(draft.emoji || '')}" placeholder="自动匹配"></label><label class="field"><span>记忆提示</span><textarea class="textarea" style="min-height:80px" name="hint" placeholder="词根拆解或联想故事">${escapeHtml(draft.hint || '')}</textarea></label></div><div class="row wrap"><button class="btn btn-secondary" type="button" data-action="lookup-form">🌐 在线补全</button><button class="btn btn-primary" type="submit">${formButton}</button>${(edit || batchDraft)?'<button class="btn btn-secondary" type="button" data-action="cancel-edit">取消</button>':''}</div></form></section></div>`;
+      return `<div class="admin-layout"><div class="stack"><section class="card card-pad"><div class="eyebrow">当前录入单词本</div><h2 style="margin-top:7px">${escapeHtml(notebookName(State.batchNotebookId || State.activeNotebookId))}</h2>${notebookSelector('录入后归属单词本',State.batchNotebookId || State.activeNotebookId)}<p class="muted small" style="line-height:1.6;margin-top:10px">批量录入和拍照识别的词条会进入这个单词本。</p></section><section class="card card-pad"><div class="eyebrow">📷 拍照识别</div><h2 style="margin-top:7px">拍下英文词表</h2><p class="muted small" style="line-height:1.65;margin-top:9px">识别后只保留英文词头，自动过滤例句、中文和画面按钮。手机大图会先自动压缩。</p><label class="btn btn-primary btn-block file-input-label" style="margin-top:15px">📷 拍照 / 从相册选择<input type="file" accept="image/*,.heic,.heif" data-input="ocr-file" aria-label="拍照或从相册选择词表图片"></label><div class="tiny muted" data-ocr-status style="margin-top:11px">${escapeHtml(State.ocrStatus || '支持 iPhone/iPad 相册照片；确认后才会发送识别，本工具不保存原图。')}</div>${renderOcrResult()}</section><section class="card card-pad"><div class="row between"><div><div class="eyebrow">批量录入</div><h2 style="margin-top:7px">每行一个单词或词组</h2></div><span class="badge blue">本地优先</span></div><textarea class="textarea" style="margin-top:15px" data-input="batch-text" placeholder="a variety of\npublic transport\nsnowstorm\nchilly">${escapeHtml(State.batchText)}</textarea><div class="row wrap" style="margin-top:12px"><button class="btn btn-secondary" data-action="parse-batch">解析并预览</button>${State.batchPreview.length?`<button class="btn btn-primary" data-action="lookup-batch" ${State.batchLookupRunning?'disabled':''}>${State.batchLookupRunning?'补全中…':'🌐 补全未收录词'}</button><button class="btn btn-success" data-action="save-batch" ${State.batchLookupRunning || !completeCount?'disabled':''}>保存 ${completeCount} 个到“${escapeHtml(notebookName(State.batchNotebookId || State.activeNotebookId))}”</button>`:''}</div>${State.batchPreview.length?`<div class="tiny muted" data-online-status style="margin-top:10px">${incompleteCount?`已有 ${completeCount} 个完整；${incompleteCount} 个留在待补充区。`:'全部资料完整，可以确认录入。'}</div>`:''}${savedSummary}${preview}</section></div><section class="card card-pad"><div class="eyebrow">${edit?'编辑单词':batchDraft?'批量词条补充':'逐条添加'}</div><h2 style="margin-top:7px">${formTitle}</h2><form id="wordForm" class="field-grid" style="margin-top:16px"><input type="hidden" name="id" value="${edit?.id || ''}"><label class="field"><span>英文单词或词组 *</span><input class="input" name="word" required value="${escapeHtml(draft.word || '')}" placeholder="例如 a variety of"></label>${notebookSelector('所属单词本',draft.notebookId || State.activeNotebookId).replace('data-input="active-notebook"','data-input="form-notebook"')}<div class="field-grid two"><label class="field"><span>音标</span><input class="input" name="phonetic" value="${escapeHtml(draft.phonetic || '')}" placeholder="自动补全"></label><label class="field"><span>中文释义</span><input class="input" name="meaning" value="${escapeHtml(draft.meaning || '')}" placeholder="自动补全"></label></div><label class="field"><span>英文例句</span><textarea class="textarea" style="min-height:90px" name="exampleEn" placeholder="自动补全真实例句">${escapeHtml(draft.exampleEn || '')}</textarea></label><label class="field"><span>中文翻译</span><input class="input" name="exampleCn" value="${escapeHtml(draft.exampleCn || '')}" placeholder="自动翻译"></label><label class="field"><span>图片链接（可选）</span><input class="input" name="imageUrl" data-input="word-image-url" value="${escapeHtml(image)}" placeholder="粘贴图片链接 https://..."></label>${renderImagePicker(draft)}<div class="field-grid two"><label class="field"><span>Emoji 兜底</span><input class="input" name="emoji" value="${escapeHtml(draft.emoji || '')}" placeholder="自动匹配"></label><label class="field"><span>记忆提示</span><textarea class="textarea" style="min-height:80px" name="hint" placeholder="词根拆解或联想故事">${escapeHtml(draft.hint || '')}</textarea></label></div><div class="row wrap"><button class="btn btn-secondary" type="button" data-action="lookup-form">🌐 在线补全</button><button class="btn btn-primary" type="submit">${formButton}</button>${(edit || batchDraft)?'<button class="btn btn-secondary" type="button" data-action="cancel-edit">取消</button>':''}</div></form></section></div>`;
     }
     document.addEventListener('click',(event)=>{ const target=event.target.closest('[data-action]'); if (!target || target.dataset.action!=='remove-batch-item') return; event.preventDefault(); event.stopPropagation(); const index=Number(target.dataset.index); State.batchPreview.splice(index,1); State.batchText=State.batchPreview.map(item=>item.word).join('\n'); if (State.batchEditIndex===index) State.batchEditIndex=null; render(); showToast('已从本次录入中移除'); },true);
 
     /** 只保存资料完整的条目；残缺条目留在预览，已有词补资料但保留学习进度。 */
     async function saveBatch() {
       const items=State.batchPreview; if (!items.length || State.batchLookupRunning) return;
+      State.batchSaveSummary=null;
       const pending=items.filter(item=>missingBatchFields(item).length); if (pending.length) await mapOnlineWithConcurrency(pending,item=>lookupWordOnline(item),6);
       const ready=items.filter(item=>!missingBatchFields(item).length); const incomplete=items.filter(item=>missingBatchFields(item).length);
       if (!ready.length) { State.batchPreview=items; render(); showToast('还没有资料完整的词，请按提示补充。'); return; }
-      const bookId=Number(State.batchNotebookId || State.activeNotebookId); const existingByWord=new Map(State.words.map(word=>[normalizeLookupTerm(word.word),word])); let added=0,updated=0;
-      for (const raw of ready) {
-        const item={...raw,word:normalizeLookupTerm(raw.word)}; if (!item.emoji || item.emoji===EMOJI_MAP.default) item.emoji=getEmoji(item.meaning,item.word); const existing=existingByWord.get(item.word);
-        if (existing) { await DB.put('words',{...existing,phonetic:item.phonetic,meaning:item.meaning,exampleEn:item.exampleEn,exampleCn:item.exampleCn,emoji:item.emoji,hint:item.hint || existing.hint || '',imageUrl:item.imageUrl || existing.imageUrl || '',imageSource:item.imageSource || existing.imageSource || '',imageTitle:item.imageTitle || existing.imageTitle || '',contentSource:item.contentSource || existing.contentSource || ''}); updated++; }
-        else { await DB.put('words',{...item,notebookId:bookId,status:'new',reviewCount:0,lastReview:0,nextReview:0,errorCount:0,createdAt:Date.now()+added}); added++; }
+      const bookId=Number(State.batchNotebookId || State.activeNotebookId); const targetBookWords=State.words.filter(word=>Number(word.notebookId)===bookId); const existingByWord=new Map(targetBookWords.map(word=>[normalizeLookupTerm(word.word),word])); let added=0,updated=0;
+      try {
+        for (const raw of ready) {
+          const item={...raw,word:normalizeLookupTerm(raw.word)}; delete item.id; if (!item.emoji || item.emoji===EMOJI_MAP.default) item.emoji=getEmoji(item.meaning,item.word); const existing=existingByWord.get(item.word);
+          if (existing) { await DB.put('words',{...existing,phonetic:item.phonetic,meaning:item.meaning,exampleEn:item.exampleEn,exampleCn:item.exampleCn,emoji:item.emoji,hint:item.hint || existing.hint || '',imageUrl:item.imageUrl || existing.imageUrl || '',imageSource:item.imageSource || existing.imageSource || '',imageTitle:item.imageTitle || existing.imageTitle || '',contentSource:item.contentSource || existing.contentSource || ''}); updated++; }
+          else { const inserted=await DB.put('words',{...item,notebookId:bookId,status:'new',reviewCount:0,lastReview:0,nextReview:0,errorCount:0,createdAt:Date.now()+added}); existingByWord.set(item.word,inserted); added++; }
+        }
+        State.words=await DB.all('words');
+        const expected=new Set(ready.map(item=>normalizeLookupTerm(item.word))); const savedInTarget=new Set(State.words.filter(word=>Number(word.notebookId)===bookId).map(word=>normalizeLookupTerm(word.word))); const missingAfterSave=[...expected].filter(word=>!savedInTarget.has(word));
+        if (missingAfterSave.length) throw new Error(`保存复查失败：${missingAfterSave.join('、')}`);
+        State.activeNotebookId=bookId; State.batchNotebookId=bookId; State.settings.activeNotebookId=bookId; await DB.put('settings',State.settings);
+        State.batchPreview=incomplete; State.batchText=incomplete.map(item=>item.word).join('\n'); State.batchEditIndex=null; await ensureDailyLog();
+        const savedCount=expected.size; State.batchSaveSummary={type:'success',message:`已确认保存 ${savedCount} 个词到“${notebookName(bookId)}”${incomplete.length?`；另有 ${incomplete.length} 个待补充`:''}`}; render(); showToast(`已保存 ${savedCount} 个词，可去词库查看`);
+      } catch (error) {
+        State.words=await DB.all('words'); State.batchSaveSummary={type:'error',message:`保存没有完成：${error?.message || '本机存储暂时不可用'}。完整词仍保留在预览，可再次保存。`}; render(); showToast('保存失败，词条没有从预览移除');
       }
-      State.words=await DB.all('words'); State.batchPreview=incomplete; State.batchText=incomplete.map(item=>item.word).join('\n'); State.batchEditIndex=null; await ensureDailyLog(); render();
-      const saved=[added?`新增 ${added} 个`:'',updated?`补齐 ${updated} 个已有词`:''].filter(Boolean).join('，'); showToast(`${saved}${incomplete.length?`；${incomplete.length} 个待补充`:''}`);
     }
     async function saveWordForm(form) {
       const data=Object.fromEntries(new FormData(form).entries()); const batchIndex=Number.isInteger(State.batchEditIndex)?State.batchEditIndex:null; const existing=data.id?State.words.find(word=>word.id===Number(data.id)):null; const base=batchIndex!==null?State.batchPreview[batchIndex]:existing; const typed=String(data.word || '').trim(); if (!typed) { showToast('请先填写英文单词或词组'); return; }
@@ -2168,7 +2239,7 @@
       if (missingBatchFields(next).length) await lookupWordOnline(next); if (!next.emoji || next.emoji===EMOJI_MAP.default) next.emoji=getEmoji(next.meaning,next.word); const missing=missingBatchFields(next);
       if (missing.length) { if (batchIndex!==null) State.batchPreview[batchIndex]=next; render(); showToast('仍缺少：'+missing.join('、')); return; }
       if (batchIndex!==null) { State.batchPreview[batchIndex]=next; State.batchEditIndex=null; State.wordImageDraft=null; render(); showToast('这条资料已补充完整'); return; }
-      const duplicate=State.words.find(word=>normalizeLookupTerm(word.word)===next.word && word.id!==next.id); if (duplicate) { showToast('词库里已经有这个单词啦'); return; }
+      const duplicate=State.words.find(word=>normalizeLookupTerm(word.word)===next.word && Number(word.notebookId)===Number(next.notebookId) && word.id!==next.id); if (duplicate) { showToast('这个单词本里已经有这个词啦'); return; }
       await DB.put('words',next); State.words=await DB.all('words'); State.editingWordId=null; State.wordImageDraft=null; State.wordImageSource=null; State.wordImageTitle=''; State.imageStatus=''; await ensureDailyLog(); showToast(existing?'单词已更新':'单词已加入词库'); render();
     }
     /** 一次性修复已知旧词资料，保留学习状态、次数、希币、图片和所属单词本。 */
