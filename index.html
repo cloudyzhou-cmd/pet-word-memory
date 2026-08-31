@@ -417,7 +417,7 @@
       route: '/learn', currentUser: 'child', today: todayKey(), settings: { ...DEFAULT_SETTINGS }, words: [], logs: [], notebooks: [], activeNotebookId: null, legacyWordsPresent: false,
       currentTask: null, guidePage: 0, showGuide: false, stageAReadyAt: 0, stageAFlipped: false, stageB: null, spell: null, weeklyTest: null,
       adminTab: 'overview', adminLoggedIn: false, adminSearch: '', adminPage: 1, editingWordId: null, batchPreview: [], importPayload: null,
-      wordSearch: '', batchText: '', batchLookupRunning: false, batchEditIndex: null, batchSaveSummary: null, ocrStatus: '', selectedWordId: null, toastTimer: null, wordImageDraft: null, wordImageSource: null, wordImageTitle: '', imageStatus: '', notebookSearch: '', notebookEditingId: null
+      wordSearch: '', batchText: '', batchLookupRunning: false, batchEditIndex: null, batchSaveSummary: null, ocrStatus: '', ocrRunning: false, ocrQueue: [], selectedWordId: null, toastTimer: null, wordImageDraft: null, wordImageSource: null, wordImageTitle: '', imageStatus: '', notebookSearch: '', notebookEditingId: null
     };
 
     /** 读取本地数据，并在首次启动时写入示例词。 */
@@ -2171,18 +2171,20 @@
       if (blob.size>1024*1024) throw new Error('PHOTO_TOO_LARGE');
       return typeof File==='function' ? new File([blob], 'xixi-ocr.jpg', { type:'image/jpeg', lastModified:Date.now() }) : blob;
     }
-    /** 照片识别成功后直接生成完整预览；已有输入会保留并自动去重。 */
+    /** 处理一张照片；识别结果会追加到本次批量预览，不覆盖前一张照片。 */
     async function recognizeVocabularyPhoto(file) {
       if (!isOcrImageFile(file)) { showToast('请选择一张图片'); return; }
       if (!confirm('照片会上传到 OCR.Space 在线识别服务，仅用于本次文字识别。是否继续？')) return;
-      State.ocrStatus='正在优化手机照片…'; State.ocrRaw=''; State.ocrCandidates=[]; State.batchSaveSummary=null; render();
+      State.ocrStatus='正在优化手机照片…'; State.batchSaveSummary=null; render();
       try {
         const upload=await prepareOcrUpload(file); State.ocrStatus=`正在上传识别（${Math.max(1,Math.round(upload.size/1024))}KB）…`; render();
         const form=new FormData(); form.append('file',upload,'xixi-ocr.jpg'); form.append('language','eng'); form.append('OCREngine','2'); form.append('isOverlayRequired','false'); form.append('scale','true'); form.append('detectOrientation','true');
         const response=await fetchWithTimeout(OCR_API,{method:'POST',headers:{apikey:OCR_TEST_KEY},body:form},30000); if (!response.ok) throw new Error(`OCR_${response.status}`);
         const payload=await response.json(); if (payload.IsErroredOnProcessing) throw new Error([].concat(payload.ErrorMessage || []).join(' ') || 'OCR处理失败');
         const raw=(payload.ParsedResults || []).map(item=>item.ParsedText || '').join('\n'); const candidates=extractVocabularyFromOcr(raw); if (!candidates.length) throw new Error('没有识别到清晰词头');
-        State.ocrRaw=raw.trim(); State.ocrCandidates=candidates; State.batchText=[State.batchText.trim(),candidates.join('\n')].filter(Boolean).join('\n'); State.batchPreview=parseBatchInput(State.batchText); State.ocrStatus=`识别到 ${candidates.length} 个词语，已过滤例句和画面杂讯。`;
+        const seen=new Set(State.ocrCandidates || []); const newCandidates=candidates.filter(word=>!seen.has(word));
+        State.ocrRaw=[State.ocrRaw,raw.trim()].filter(Boolean).join('\n\n'); State.ocrCandidates=[...(State.ocrCandidates || []),...newCandidates];
+        State.batchText=[State.batchText.trim(),...newCandidates].filter(Boolean).join('\n'); State.batchPreview=parseBatchInput(State.batchText); State.ocrStatus=`本次识别 ${candidates.length} 个词语，新增 ${newCandidates.length} 个；累计 ${State.ocrCandidates.length} 个。`;
         render(); const pending=State.batchPreview.filter(item=>missingBatchFields(item).length); if (pending.length) await lookupBatchOnline(); else showToast(`照片识别完成：${candidates.length} 个词语`);
       } catch (error) {
         if (error?.name==='AbortError') State.ocrStatus='识别超时，请检查网络后重试。';
@@ -2192,6 +2194,24 @@
         render(); showToast(State.ocrStatus);
       }
     }
+    /** 识别队列：第二张照片在第一张补全期间也会排队，避免多个异步流程互相覆盖状态。 */
+    async function queueVocabularyPhoto(file) {
+      if (!isOcrImageFile(file)) { showToast('请选择图片文件'); return; }
+      State.ocrQueue.push(file);
+      if (State.ocrRunning) { State.ocrStatus=`当前正在处理上一张照片，已加入队列（还有 ${State.ocrQueue.length} 张待处理）`; render(); return; }
+      State.ocrRunning=true;
+      try {
+        while (State.ocrQueue.length) {
+          const next=State.ocrQueue.shift(); await recognizeVocabularyPhoto(next);
+          if (State.ocrQueue.length) { State.ocrStatus=`上一张照片已完成，继续处理下一张（还有 ${State.ocrQueue.length} 张）`; render(); }
+        }
+      } finally { State.ocrRunning=false; render(); }
+    }
+    /* 捕获阶段接管OCR文件变化，阻止旧版监听器再次启动同一个识别流程。 */
+    document.addEventListener('change',(event)=>{
+      const input=event.target; if (input.dataset.input!=='ocr-file') return;
+      event.preventDefault(); event.stopImmediatePropagation(); const file=input.files?.[0]; input.value=''; if (file) void queueVocabularyPhoto(file);
+    },true);
     function renderOcrResult() {
       if (!State.ocrCandidates?.length && !State.ocrRaw) return '';
       return `<div class="ocr-result"><strong>${escapeHtml(State.ocrStatus || '照片识别完成')}</strong>${State.ocrCandidates?.length?`<div class="ocr-chips">${State.ocrCandidates.map(word=>`<span class="ocr-chip">${escapeHtml(word)}</span>`).join('')}</div>`:''}${State.ocrRaw?`<details class="ocr-raw"><summary>查看识别原文（排错用）</summary><pre>${escapeHtml(State.ocrRaw)}</pre></details>`:''}</div>`;
