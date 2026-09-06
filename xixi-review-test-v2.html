@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="希希词语家">
+  <title>希希词语家 · 复习流程小版本</title>
+  <style>
+    :root {
+      --blue: #087df5;
+      --blue-soft: #eaf3ff;
+      --green: #20b85a;
+      --green-soft: #eafaf0;
+      --orange: #f28a12;
+      --orange-soft: #fff5e5;
+      --red: #e44343;
+      --red-soft: #fff0f0;
+      --ink: #182033;
+      --muted: #7d879a;
+      --line: #e3e8f1;
+      --page: #f3f6fb;
+      --card: #ffffff;
+      --radius: 24px;
+      --shadow: 0 14px 38px rgba(52, 74, 112, .10);
+    }
+
+    * { box-sizing: border-box; }
+    html { min-width: 320px; background: var(--page); }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 10% 0%, rgba(8,125,245,.12), transparent 28rem),
+        var(--page);
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    button, input { font: inherit; }
+    button { -webkit-tap-highlight-color: transparent; }
+    .app-shell {
+      width: min(100% - 24px, 1080px);
+      margin: 0 auto;
+      padding: 18px 0 42px;
+    }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #0b88ff, #5d5bea);
+      color: #fff;
+      font-size: 28px;
+      box-shadow: 0 9px 22px rgba(8,125,245,.22);
+    }
+    h1, h2, h3, p { margin: 0; }
+    h1 { font-size: clamp(22px, 3.2vw, 34px); letter-spacing: -.02em; }
+    .subtitle { margin-top: 4px; color: var(--muted); font-size: 14px; }
+    .test-badge {
+      flex: 0 0 auto;
+      padding: 9px 13px;
+      border: 1px solid #b9d9ff;
+      border-radius: 999px;
+      background: var(--blue-soft);
+      color: #0869d3;
+      font-weight: 700;
+      font-size: 14px;
+    }
+    .panel {
+      padding: clamp(20px, 4vw, 44px);
+      border: 1px solid rgba(216, 224, 237, .86);
+      border-radius: var(--radius);
+      background: rgba(255,255,255,.96);
+      box-shadow: var(--shadow);
+    }
+    .intro h2 { font-size: clamp(24px, 4vw, 42px); line-height: 1.2; }
+    .intro p { margin-top: 12px; color: var(--muted); font-size: clamp(16px, 2.2vw, 20px); line-height: 1.65; }
+    .test-rules {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 26px;
+    }
+    .rule {
+      min-height: 108px;
+      padding: 16px;
+      border-radius: 18px;
+      background: #f7f9fd;
+      border: 1px solid var(--line);
+    }
+    .rule strong { display: block; font-size: 18px; }
+    .rule span { display: block; margin-top: 7px; color: var(--muted); line-height: 1.5; }
+    .mode-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+      margin-top: 30px;
+    }
+    .mode-card {
+      min-height: 180px;
+      padding: 24px;
+      text-align: left;
+      border: 2px solid var(--line);
+      border-radius: 22px;
+      background: #fff;
+      color: var(--ink);
+      cursor: pointer;
+      transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+    }
+    .mode-card:hover, .mode-card:focus-visible { border-color: var(--blue); box-shadow: 0 10px 24px rgba(8,125,245,.13); }
+    .mode-card:active { transform: scale(.985); }
+    .mode-icon { font-size: 36px; }
+    .mode-card h3 { margin-top: 12px; font-size: clamp(21px, 3vw, 29px); }
+    .mode-card p { margin-top: 8px; color: var(--muted); font-size: 16px; line-height: 1.5; }
+    .mode-card.review { border-color: #bfe2cc; background: linear-gradient(145deg,#fff,#f4fff7); }
+    .mode-card.weekly { border-color: #ffd79f; background: linear-gradient(145deg,#fff,#fff9ef); }
+    .small-note { margin-top: 20px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+
+    .session-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+    .session-kicker { color: var(--blue); font-weight: 800; font-size: clamp(18px, 2.6vw, 24px); }
+    .session-title { margin-top: 7px; font-size: clamp(25px, 4.5vw, 48px); line-height: 1.15; }
+    .progress-wrap { min-width: 150px; text-align: right; }
+    .progress-label { color: var(--muted); font-weight: 700; font-size: 15px; }
+    .progress-track { height: 10px; margin-top: 10px; overflow: hidden; border-radius: 99px; background: #eaf0f7; }
+    .progress-bar { height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--blue), #735cec); transition: width .25s ease; }
+    .phase-guide {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 26px;
+      color: var(--muted);
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .phase-guide .current { color: var(--blue); }
+    .phase-dot { width: 8px; height: 8px; border-radius: 50%; background: #cfd7e5; }
+    .phase-dot.current { background: var(--blue); }
+    .study-card { margin-top: 26px; text-align: center; }
+    .visual-box {
+      display: grid;
+      place-items: center;
+      width: min(100%, 280px);
+      aspect-ratio: 1;
+      margin: 0 auto;
+      border-radius: 34px;
+      background: linear-gradient(145deg, #f7f9fd, #eef3fb);
+      box-shadow: inset 0 0 0 1px #edf1f7, 0 12px 28px rgba(76,97,133,.08);
+    }
+    .visual-emoji { font-size: clamp(76px, 14vw, 126px); line-height: 1; }
+    .visual-label { margin-top: 10px; color: var(--muted); font-size: 14px; }
+    .word-title { margin-top: 25px; font-size: clamp(42px, 8vw, 78px); line-height: 1.05; letter-spacing: -.04em; }
+    .phonetic { margin-top: 10px; color: var(--muted); font-size: clamp(17px, 2.5vw, 23px); }
+    .meaning-prompt { margin-top: 24px; font-size: clamp(19px, 3vw, 28px); font-weight: 800; }
+    .options { display: grid; gap: 13px; margin-top: 22px; text-align: left; }
+    .option {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      width: 100%;
+      min-height: 68px;
+      padding: 14px 18px;
+      border: 2px solid var(--line);
+      border-radius: 18px;
+      background: #fff;
+      color: var(--ink);
+      text-align: left;
+      cursor: pointer;
+      transition: border-color .15s ease, background .15s ease, transform .15s ease;
+    }
+    .option:hover, .option:focus-visible { border-color: #9ec8ff; background: #f8fbff; }
+    .option:active { transform: scale(.995); }
+    .option.correct { border-color: var(--green); background: var(--green-soft); color: #117a39; }
+    .option.wrong { border-color: var(--red); background: var(--red-soft); color: #b62626; animation: shake .3s ease; }
+    .option-letter {
+      display: grid;
+      place-items: center;
+      flex: 0 0 38px;
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      background: #f0f3f8;
+      color: var(--muted);
+      font-weight: 800;
+    }
+    .option-text { font-size: clamp(18px, 2.5vw, 25px); font-weight: 700; line-height: 1.3; }
+    .feedback {
+      min-height: 34px;
+      margin-top: 18px;
+      font-size: clamp(17px, 2.5vw, 22px);
+      font-weight: 800;
+    }
+    .feedback.good { color: var(--green); }
+    .feedback.bad { color: var(--red); }
+    .feedback.info { color: var(--muted); }
+    .meaning-answer { margin-top: 8px; color: var(--muted); font-size: 15px; }
+
+    .spell-card { margin-top: 26px; text-align: center; }
+    .spell-meaning { font-size: clamp(27px, 5vw, 48px); font-weight: 800; }
+    .spell-instruction { margin-top: 8px; color: var(--muted); font-size: clamp(17px, 2.7vw, 23px); }
+    .sentence { max-width: 780px; margin: 22px auto 0; padding: 16px 18px; border-radius: 16px; background: #f7f9fd; color: #5b667a; font-size: clamp(16px, 2.4vw, 21px); line-height: 1.6; }
+    .sentence strong { color: var(--blue); }
+    .spell-row { display: flex; gap: 12px; max-width: 760px; margin: 24px auto 0; }
+    .spell-input {
+      width: 100%;
+      min-height: 68px;
+      padding: 12px 18px;
+      border: 3px solid #b9c9df;
+      border-radius: 17px;
+      background: #fff;
+      color: var(--ink);
+      text-align: center;
+      font-size: clamp(24px, 4vw, 38px);
+      font-weight: 800;
+      outline: none;
+    }
+    .spell-input:focus { border-color: var(--blue); box-shadow: 0 0 0 5px rgba(8,125,245,.12); }
+    .spell-input.error { border-color: var(--red); background: var(--red-soft); animation: shake .3s ease; }
+    .spell-input.good { border-color: var(--green); background: var(--green-soft); }
+    .actions { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin-top: 18px; }
+    .btn {
+      min-width: 150px;
+      min-height: 54px;
+      padding: 12px 22px;
+      border: 0;
+      border-radius: 15px;
+      background: var(--blue);
+      color: #fff;
+      font-size: clamp(17px, 2.5vw, 22px);
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 9px 19px rgba(8,125,245,.18);
+    }
+    .btn:active { transform: scale(.97); }
+    .btn.secondary { background: #eef2f8; color: #566176; box-shadow: none; }
+    .btn.success { background: var(--green); }
+    .btn:disabled { opacity: .48; cursor: not-allowed; box-shadow: none; }
+    .hint { min-height: 30px; margin-top: 16px; color: var(--orange); font-size: 17px; font-weight: 700; }
+    .attempt-note { margin-top: 10px; color: var(--muted); font-size: 14px; }
+    .completion { text-align: center; }
+    .completion-icon { font-size: 82px; }
+    .completion h2 { margin-top: 15px; font-size: clamp(30px, 5vw, 54px); }
+    .completion p { margin-top: 12px; color: var(--muted); font-size: 18px; line-height: 1.6; }
+    .summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 520px; margin: 24px auto; }
+    .summary-item { padding: 16px; border-radius: 16px; background: #f7f9fd; }
+    .summary-item strong { display: block; font-size: 28px; color: var(--blue); }
+    .summary-item span { color: var(--muted); }
+    .back-link { display: block; margin: 20px auto 0; border: 0; background: transparent; color: var(--blue); font-size: 16px; font-weight: 700; cursor: pointer; min-height: 44px; }
+    .footer-note { margin-top: 18px; color: #9ba5b7; text-align: center; font-size: 13px; line-height: 1.5; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-7px); } 75% { transform: translateX(7px); } }
+    @media (max-width: 620px) {
+      .app-shell { width: min(100% - 16px, 560px); padding-top: 10px; }
+      .topbar { align-items: flex-start; }
+      .brand-mark { width: 44px; height: 44px; border-radius: 13px; font-size: 24px; }
+      .test-badge { padding: 7px 10px; font-size: 12px; }
+      .test-rules { grid-template-columns: 1fr; }
+      .rule { min-height: auto; padding: 13px 15px; }
+      .mode-grid { grid-template-columns: 1fr; }
+      .mode-card { min-height: 145px; padding: 19px; }
+      .session-header { display: block; }
+      .progress-wrap { margin-top: 16px; text-align: left; }
+      .visual-box { width: min(60vw, 240px); }
+      .spell-row { display: block; }
+      .spell-row .btn { width: 100%; margin-top: 10px; }
+      .panel { padding: 20px 15px; border-radius: 21px; }
+    }
+    /* 10.2 寸 iPad：给平板足够的横向空间与触摸尺寸。 */
+    @media (min-width: 700px) {
+      .app-shell { width: min(calc(100% - 56px), 1040px); padding-top: 30px; }
+      .panel { padding: clamp(34px, 5vw, 58px); }
+      .option { min-height: 82px; padding-left: 24px; padding-right: 24px; }
+      .btn { min-height: 60px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">希</div>
+        <div>
+          <h1>希希词语家</h1>
+          <p class="subtitle">复习与周测流程小版本</p>
+        </div>
+      </div>
+      <span class="test-badge">独立测试版 v2</span>
+    </header>
+    <div id="app" aria-live="polite"></div>
+    <p class="footer-note">本页面只使用临时示例数据，不会读取或修改正式版的学习记录。</p>
+  </main>
+
+  <script>
+    /** 小版本使用的固定测试词，专门覆盖图片、中文选项和拼写流程。 */
+    const TEST_WORDS = [
+      { word: 'foggy', phonetic: '/ˈfɒɡi/', meaning: '有雾的', emoji: '🌫️', sentence: 'It was foggy, so we drove slowly.' },
+      { word: 'freezing', phonetic: '/ˈfriːzɪŋ/', meaning: '极冷的；冰冻的', emoji: '🥶', sentence: 'It is freezing outside today.' },
+      { word: 'frost', phonetic: '/frɒst/', meaning: '霜；冰霜', emoji: '❄️', sentence: 'The grass was covered with frost this morning.' },
+      { word: 'lightning', phonetic: '/ˈlaɪtnɪŋ/', meaning: '闪电', emoji: '⚡', sentence: 'The lightning lit up the dark sky.' },
+      { word: 'thunder', phonetic: '/ˈθʌndə(r)/', meaning: '雷声；雷', emoji: '🌩️', sentence: 'We heard loud thunder after the lightning.' },
+      { word: 'shower', phonetic: '/ˈʃaʊə(r)/', meaning: '阵雨；淋浴', emoji: '🌦️', sentence: 'There will be a short shower this afternoon.' }
+    ];
+
+    const state = {
+      screen: 'home',
+      mode: null,
+      phase: 'meaning',
+      index: 0,
+      selected: null,
+      feedback: '',
+      feedbackType: 'info',
+      spelling: '',
+      spellStatus: '',
+      hintUsed: false,
+      attempts: 0,
+      totalWrong: 0,
+      startedAt: 0
+    };
+
+    const app = document.getElementById('app');
+
+    /** HTML 转义，避免测试内容被当作标签解析。 */
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
+    }
+
+    /** 获取当前模式的测试词。复习和周测故意使用相同的两阶段流程。 */
+    function currentWords() { return TEST_WORDS; }
+
+    /** 为当前单词生成只包含中文释义的四个选项。 */
+    function makeOptions(word, index) {
+      const distractors = TEST_WORDS.filter(item => item.word !== word.word).map(item => item.meaning);
+      const rotated = distractors.slice(index % distractors.length).concat(distractors.slice(0, index % distractors.length));
+      return [word.meaning, rotated[0], rotated[1], rotated[2]].sort((a, b) => {
+        const seed = (word.word.length + a.length + index) % 2;
+        return seed ? a.localeCompare(b, 'zh-CN') : b.localeCompare(a, 'zh-CN');
+      });
+    }
+
+    /** 返回当前阶段的进度文字。 */
+    function progressText() {
+      const total = currentWords().length;
+      return state.phase === 'meaning'
+        ? `第一步 · 选中文意思 · ${state.index + 1}/${total}`
+        : `第二步 · 拼写单词 · ${state.index + 1}/${total}`;
+    }
+
+    /** 将指定模式重置到第一个单词。 */
+    function start(mode) {
+      state.screen = 'session';
+      state.mode = mode;
+      state.phase = 'meaning';
+      state.index = 0;
+      state.selected = null;
+      state.feedback = '';
+      state.feedbackType = 'info';
+      state.spelling = '';
+      state.spellStatus = '';
+      state.hintUsed = false;
+      state.attempts = 0;
+      state.totalWrong = 0;
+      state.startedAt = Date.now();
+      render();
+    }
+
+    /** 回到模式选择页。 */
+    function goHome() {
+      state.screen = 'home';
+      state.mode = null;
+      render();
+    }
+
+    /** 进入拼写阶段，保持单词顺序不变。 */
+    function enterSpelling() {
+      state.phase = 'spelling';
+      state.index = 0;
+      state.spelling = '';
+      state.spellStatus = '';
+      state.hintUsed = false;
+      state.attempts = 0;
+      state.feedback = '';
+      render();
+      focusSpellingInput();
+    }
+
+    /** 选择中文释义；答错时停留在当前单词，答对后才能继续。 */
+    function chooseMeaning(value) {
+      if (state.selected === currentWords()[state.index].meaning) return;
+      const word = currentWords()[state.index];
+      state.selected = value;
+      if (value === word.meaning) {
+        state.feedback = '答对了！可以进入下一个单词。';
+        state.feedbackType = 'good';
+      } else {
+        state.feedback = '再想想 💡 请选择正确的中文意思。';
+        state.feedbackType = 'bad';
+        state.totalWrong += 1;
+      }
+      render();
+    }
+
+    /** 进入下一个中文选择题，最后一个完成后进入拼写阶段。 */
+    function nextMeaning() {
+      if (state.selected !== currentWords()[state.index].meaning) return;
+      if (state.index >= currentWords().length - 1) {
+        enterSpelling();
+        return;
+      }
+      state.index += 1;
+      state.selected = null;
+      state.feedback = '';
+      state.feedbackType = 'info';
+      render();
+    }
+
+    /** 检查拼写。错误时只提示，不跳过；正确后才能继续。 */
+    function checkSpelling() {
+      const word = currentWords()[state.index];
+      const answer = state.spelling.trim().toLowerCase();
+      if (!answer) {
+        state.spellStatus = 'empty';
+        render();
+        focusSpellingInput();
+        return;
+      }
+      state.attempts += 1;
+      if (answer === word.word) {
+        state.spellStatus = 'correct';
+        state.feedback = '拼写正确！🌟';
+        state.feedbackType = 'good';
+      } else {
+        state.spellStatus = 'wrong';
+        state.feedback = '拼写不对，再试一次。提示：注意字母顺序。';
+        state.feedbackType = 'bad';
+        state.totalWrong += 1;
+      }
+      render();
+      if (state.spellStatus !== 'correct') focusSpellingInput();
+    }
+
+    /** 给出一个首字母提示，不直接泄露完整答案。 */
+    function showHint() {
+      state.hintUsed = true;
+      state.feedback = `提示：第一个字母是 “${currentWords()[state.index].word[0]}”，共 ${currentWords()[state.index].word.length} 个字母。`;
+      state.feedbackType = 'info';
+      render();
+      focusSpellingInput();
+    }
+
+    /** 进入拼写阶段的下一个词或完成页。 */
+    function nextSpelling() {
+      if (state.spellStatus !== 'correct') return;
+      if (state.index >= currentWords().length - 1) {
+        state.screen = 'complete';
+        render();
+        return;
+      }
+      state.index += 1;
+      state.spelling = '';
+      state.spellStatus = '';
+      state.hintUsed = false;
+      state.attempts = 0;
+      state.feedback = '';
+      state.feedbackType = 'info';
+      render();
+      focusSpellingInput();
+    }
+
+    /** 请求浏览器朗读单词；设备不支持时静默跳过。 */
+    function speakCurrent() {
+      if (!('speechSynthesis' in window)) return;
+      const word = currentWords()[state.index];
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(word.word);
+      utterance.lang = 'en-US';
+      utterance.rate = .78;
+      window.speechSynthesis.speak(utterance);
+    }
+
+    /** 让 iPad 外接键盘或屏幕键盘优先聚焦到输入框。 */
+    function focusSpellingInput() {
+      window.setTimeout(() => document.getElementById('spelling-input')?.focus(), 30);
+    }
+
+    /** 绘制首页，提供复习与周测两个入口。 */
+    function renderHome() {
+      return `
+        <section class="panel intro">
+          <h2>先验证复习流程，再接入正式版</h2>
+          <p>这个小版本内置 6 个临时单词。复习和周测都严格按“先选中文意思，再拼写英文”的两步进行。</p>
+          <div class="test-rules">
+            <div class="rule"><strong>第一步</strong><span>英文单词 + 图片<br>4 个中文释义选项</span></div>
+            <div class="rule"><strong>第二步</strong><span>中文释义 + 图片<br>必须拼写正确才能继续</span></div>
+            <div class="rule"><strong>错误处理</strong><span>选错或拼错会停留<br>提示后重新完成</span></div>
+          </div>
+          <div class="mode-grid">
+            <button class="mode-card review" data-action="start-review">
+              <span class="mode-icon" aria-hidden="true">📙</span>
+              <h3>测试今日复习</h3>
+              <p>6 个词，完整验证两步复习流程</p>
+            </button>
+            <button class="mode-card weekly" data-action="start-weekly">
+              <span class="mode-icon" aria-hidden="true">🏆</span>
+              <h3>测试周测</h3>
+              <p>6 个词，流程与复习完全一致</p>
+            </button>
+          </div>
+          <p class="small-note">测试重点：答错后不会卡死；点击正确选项后可以进入下一个词；拼写错误后可以无限重试。</p>
+        </section>`;
+    }
+
+    /** 绘制选择中文意思阶段。 */
+    function renderMeaningPhase(word) {
+      const options = makeOptions(word, state.index);
+      const answerReady = state.selected === word.meaning;
+      const selectedValue = state.selected;
+      return `
+        <section class="panel">
+          <div class="session-header">
+            <div>
+              <div class="session-kicker">${state.mode === 'weekly' ? '🏆 周测' : '📙 今日复习'}</div>
+              <h2 class="session-title">第一步：知道意思</h2>
+            </div>
+            <div class="progress-wrap">
+              <div class="progress-label">${progressText()}</div>
+              <div class="progress-track"><div class="progress-bar" style="width:${((state.index + 1) / currentWords().length) * 50}%"></div></div>
+            </div>
+          </div>
+          <div class="phase-guide"><span class="phase-dot current"></span><span class="current">选中文意思</span><span class="phase-dot"></span><span>拼写英文</span></div>
+          <div class="study-card">
+            <div class="visual-box"><div class="visual-emoji" role="img" aria-label="${escapeHtml(word.word)} 学习图片">${word.emoji}</div></div>
+            <div class="visual-label">学习图片</div>
+            <div class="word-title">${escapeHtml(word.word)}</div>
+            <div class="phonetic">${escapeHtml(word.phonetic)}</div>
+            <div class="meaning-prompt">这个单词是什么意思？</div>
+            <div class="options">
+              ${options.map((option, optionIndex) => {
+                const isCorrect = answerReady && option === word.meaning;
+                const isWrong = selectedValue && !answerReady && selectedValue === option;
+                return `<button class="option ${isCorrect ? 'correct' : ''} ${isWrong ? 'wrong' : ''}" data-action="choose-meaning" data-value="${escapeHtml(option)}">
+                  <span class="option-letter">${String.fromCharCode(65 + optionIndex)}</span><span class="option-text">${escapeHtml(option)}</span>
+                </button>`;
+              }).join('')}
+            </div>
+            <div class="feedback ${state.feedbackType}">${escapeHtml(state.feedback)}</div>
+            ${answerReady ? `<div class="meaning-answer">正确答案：${escapeHtml(word.meaning)}</div>` : ''}
+            <div class="actions">
+              <button class="btn secondary" data-action="speak">🔊 听发音</button>
+              <button class="btn" data-action="next-meaning" ${answerReady ? '' : 'disabled'}>${state.index === currentWords().length - 1 ? '进入拼写测试 →' : '下一个 →'}</button>
+            </div>
+          </div>
+        </section>`;
+    }
+
+    /** 绘制拼写阶段。 */
+    function renderSpellingPhase(word) {
+      const completed = state.spellStatus === 'correct';
+      const inputClass = state.spellStatus === 'wrong' ? 'error' : completed ? 'good' : '';
+      return `
+        <section class="panel">
+          <div class="session-header">
+            <div>
+              <div class="session-kicker">${state.mode === 'weekly' ? '🏆 周测' : '📙 今日复习'}</div>
+              <h2 class="session-title">第二步：拼写英文</h2>
+            </div>
+            <div class="progress-wrap">
+              <div class="progress-label">${progressText()}</div>
+              <div class="progress-track"><div class="progress-bar" style="width:${50 + ((state.index + 1) / currentWords().length) * 50}%"></div></div>
+            </div>
+          </div>
+          <div class="phase-guide"><span class="phase-dot"></span><span>选中文意思</span><span class="phase-dot current"></span><span class="current">拼写英文</span></div>
+          <div class="spell-card">
+            <div class="visual-box"><div class="visual-emoji" role="img" aria-label="${escapeHtml(word.word)} 学习图片">${word.emoji}</div></div>
+            <div class="visual-label">学习图片</div>
+            <div class="spell-meaning">${escapeHtml(word.meaning)}</div>
+            <div class="spell-instruction">请根据中文意思拼写这个单词</div>
+            <div class="sentence">${escapeHtml(word.sentence.replace(new RegExp(word.word, 'ig'), '_____'))}</div>
+            <div class="spell-row">
+              <input id="spelling-input" class="spell-input ${inputClass}" value="${escapeHtml(state.spelling)}" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="输入英文单词" aria-label="输入英文单词">
+              <button class="btn" data-action="check-spelling" ${completed ? 'disabled' : ''}>检查答案</button>
+            </div>
+            <div class="hint">${state.hintUsed ? `提示：首字母是 “${escapeHtml(word.word[0])}”，共 ${word.word.length} 个字母。` : ''}</div>
+            <div class="feedback ${state.feedbackType}">${escapeHtml(state.feedback)}</div>
+            <div class="attempt-note">拼写错误不会跳过，必须正确后才能进入下一个单词。</div>
+            <div class="actions">
+              <button class="btn secondary" data-action="hint" ${state.hintUsed || completed ? 'disabled' : ''}>💡 提示</button>
+              <button class="btn" data-action="speak">🔊 听发音</button>
+              <button class="btn success" data-action="next-spelling" ${completed ? '' : 'disabled'}>${state.index === currentWords().length - 1 ? '完成本次测试' : '下一个 →'}</button>
+            </div>
+          </div>
+        </section>`;
+    }
+
+    /** 绘制完成页。 */
+    function renderComplete() {
+      const minutes = Math.max(1, Math.round((Date.now() - state.startedAt) / 60000));
+      return `
+        <section class="panel completion">
+          <div class="completion-icon">🎉</div>
+          <h2>${state.mode === 'weekly' ? '周测完成！' : '复习完成！'}</h2>
+          <p>你已经完成全部 ${currentWords().length} 个单词的“选意思 + 拼写”两步测试。</p>
+          <div class="summary">
+            <div class="summary-item"><strong>${currentWords().length}</strong><span>完成单词</span></div>
+            <div class="summary-item"><strong>${state.totalWrong}</strong><span>需要重试次数</span></div>
+          </div>
+          <button class="btn" data-action="restart">再测试一次</button>
+          <button class="back-link" data-action="home">返回选择页</button>
+          <p class="small-note">这是测试页结果，不会写入正式版积分、学习记录或复习计划。</p>
+        </section>`;
+    }
+
+    /** 根据当前状态渲染整个小版本页面。 */
+    function render() {
+      if (state.screen === 'home') {
+        app.innerHTML = renderHome();
+        return;
+      }
+      if (state.screen === 'complete') {
+        app.innerHTML = renderComplete();
+        return;
+      }
+      const word = currentWords()[state.index];
+      app.innerHTML = state.phase === 'meaning' ? renderMeaningPhase(word) : renderSpellingPhase(word);
+    }
+
+    /** 统一处理按钮点击。 */
+    app.addEventListener('click', event => {
+      const target = event.target.closest('[data-action]');
+      if (!target) return;
+      const action = target.dataset.action;
+      if (action === 'start-review') start('review');
+      if (action === 'start-weekly') start('weekly');
+      if (action === 'home') goHome();
+      if (action === 'restart') start(state.mode);
+      if (action === 'choose-meaning') chooseMeaning(target.dataset.value);
+      if (action === 'next-meaning') nextMeaning();
+      if (action === 'check-spelling') checkSpelling();
+      if (action === 'next-spelling') nextSpelling();
+      if (action === 'hint') showHint();
+      if (action === 'speak') speakCurrent();
+    });
+
+    app.addEventListener('input', event => {
+      if (event.target.id === 'spelling-input') {
+        state.spelling = event.target.value;
+        if (state.spellStatus === 'wrong' || state.spellStatus === 'empty') state.spellStatus = '';
+      }
+    });
+
+    app.addEventListener('keydown', event => {
+      if (event.target.id === 'spelling-input' && event.key === 'Enter') {
+        event.preventDefault();
+        checkSpelling();
+      }
+    });
+
+    render();
+  </script>
+</body>
+</html>
