@@ -350,8 +350,15 @@
     const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
     const pad = (n) => String(n).padStart(2, '0');
     const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
+    /* 测试模式只在网址带 ?test=1 时启用，正常网址和孩子日常使用不受影响。 */
+    const TEST_QUERY = new URLSearchParams(window.location.search);
+    const TEST_MODE = TEST_QUERY.get('test') === '1';
+    const testFridayKey = () => { const d = new Date(); const distance = (5 - d.getDay() + 7) % 7; d.setDate(d.getDate() + distance); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
+    const TEST_DATE = TEST_MODE ? (TEST_QUERY.get('date') || testFridayKey()) : '';
+    const TEST_DATA_MARK = 'xixi-test-mock-v1';
+    const TEST_PREVIOUS_BOOK_KEY = 'xixi-test-previous-book-v1';
     const dateStart = (key = todayKey()) => new Date(`${key}T00:00:00`).getTime();
-    const tomorrowStart = () => dateStart() + 86400000;
+    const tomorrowStart = () => dateStart(TEST_MODE ? TEST_DATE : todayKey()) + 86400000;
     const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char]));
     /*
      * Emoji 采用“词条优先、中文释义其次、抽象词兜底”的规则。
@@ -511,7 +518,7 @@
 
     const DB = new PETDatabase();
     const State = {
-      route: '/learn', currentUser: 'child', today: todayKey(), settings: { ...DEFAULT_SETTINGS }, words: [], logs: [], notebooks: [], activeNotebookId: null, legacyWordsPresent: false,
+      route: '/learn', currentUser: 'child', today: TEST_MODE ? TEST_DATE : todayKey(), settings: { ...DEFAULT_SETTINGS }, words: [], logs: [], notebooks: [], activeNotebookId: null, legacyWordsPresent: false,
       currentTask: null, guidePage: 0, showGuide: false, stageAReadyAt: 0, stageAFlipped: false, stageB: null, spell: null, weeklyTest: null,
       adminTab: 'overview', adminLoggedIn: false, adminSearch: '', adminPage: 1, editingWordId: null, batchPreview: [], importPayload: null,
       wordSearch: '', batchText: '', batchLookupRunning: false, batchEditIndex: null, batchSaveSummary: null, ocrStatus: '', ocrRunning: false, ocrQueue: [], selectedWordId: null, toastTimer: null, wordImageDraft: null, wordImageSource: null, wordImageTitle: '', imageStatus: '', notebookSearch: '', notebookEditingId: null
@@ -542,7 +549,8 @@
       State.logs = await DB.all('dailyLog');
       /* 旧版本没有希币字段：已完成过的新词按“每词1希币”初始化一次，避免升级后积分丢失。 */
       const savedCoinIds = Array.isArray(State.settings.coinAwardedWordIds) ? State.settings.coinAwardedWordIds : [];
-      const historicalIds = unique(State.logs.flatMap(log => log.wordsStudied || [])).filter(id => State.words.some(word => word.id === id));
+      /* 测试模式的临时周日志不能被当成真实学习记录，否则会误增希币。 */
+      const historicalIds = unique(State.logs.filter(log => log.testMock !== TEST_DATA_MARK).flatMap(log => log.wordsStudied || [])).filter(id => State.words.some(word => word.id === id && word.testMock !== TEST_DATA_MARK));
       const mergedCoinIds = unique([...savedCoinIds, ...historicalIds]);
       const expectedCoins = Math.max(Number(State.settings.coins) || 0, mergedCoinIds.length);
       if (mergedCoinIds.length !== savedCoinIds.length || expectedCoins !== Number(State.settings.coins || 0)) {
@@ -553,9 +561,97 @@
         State.settings.coinAwardedWordIds = mergedCoinIds;
         State.settings.coins = expectedCoins;
       }
-      State.showGuide = localStorage.getItem('petWelcomeSeen') !== 'true';
+      State.showGuide = !TEST_MODE && localStorage.getItem('petWelcomeSeen') !== 'true';
       await ensureNotebooks();
       await seedBuiltinPetStrengthBook();
+      if (TEST_MODE) await prepareTestScenario();
+      else await cleanupTestScenario();
+    }
+
+    /**
+     * 清除测试模式写入的临时词条和日志；正式数据、学习进度和希币不受影响。
+     */
+    async function cleanupTestScenario(restoreBook = !TEST_MODE) {
+      const temporaryWords = (State.words || []).filter(word => word.testMock === TEST_DATA_MARK);
+      const temporaryIds = new Set(temporaryWords.map(word => word.id));
+      for (const word of temporaryWords) await DB.delete('words', word.id);
+      for (const log of (State.logs || []).filter(item => item.testMock === TEST_DATA_MARK)) {
+        if (log.id !== undefined) await DB.delete('dailyLog', log.id);
+      }
+      /* 兼容旧测试版本：若曾把临时词误算进希币，退出时一并移除这些临时ID。 */
+      const awarded = Array.isArray(State.settings?.coinAwardedWordIds) ? State.settings.coinAwardedWordIds : [];
+      const retainedAwarded = awarded.filter(id => !temporaryIds.has(id));
+      if (retainedAwarded.length !== awarded.length) {
+        State.settings.coinAwardedWordIds = retainedAwarded;
+        State.settings.coins = Math.max(0, Number(State.settings.coins || 0) - (awarded.length - retainedAwarded.length));
+        await DB.put('settings', State.settings);
+      }
+      if (restoreBook) {
+        let previousBookId = null;
+        try { previousBookId = Number(sessionStorage.getItem(TEST_PREVIOUS_BOOK_KEY) || 0); sessionStorage.removeItem(TEST_PREVIOUS_BOOK_KEY); } catch {}
+        if (previousBookId && State.notebooks?.some(book => Number(book.id) === previousBookId)) {
+          State.activeNotebookId = previousBookId;
+          State.settings.activeNotebookId = previousBookId;
+          await DB.put('settings', State.settings);
+        }
+      }
+      State.words = await DB.all('words');
+      State.logs = await DB.all('dailyLog');
+    }
+
+    /**
+     * 准备隔离的复习与周测数据：今天固定为周五，当前安排3个复习词，
+     * 上一周模拟学习6个词供周测使用。所有记录均带测试标记，退出后自动删除。
+     */
+    async function prepareTestScenario() {
+      await cleanupTestScenario(false);
+      try {
+        if (!sessionStorage.getItem(TEST_PREVIOUS_BOOK_KEY) && State.activeNotebookId) sessionStorage.setItem(TEST_PREVIOUS_BOOK_KEY, String(State.activeNotebookId));
+      } catch {}
+      const book = State.notebooks.find(item => item.name === PET_STRENGTH_BOOK_NAME) || activeNotebook();
+      if (!book) return;
+      State.activeNotebookId = Number(book.id);
+      State.settings.activeNotebookId = Number(book.id);
+      await DB.put('settings', State.settings);
+      const candidates = [];
+      const addCandidates = (items) => {
+        for (const item of items) if (!candidates.some(existing => existing.id === item.id)) candidates.push(item);
+      };
+      addCandidates(notebookWords(book.id).filter(word => !word.testMock).sort(compareCourseOrder));
+      addCandidates((State.words || []).filter(word => !word.testMock).sort(compareCourseOrder));
+      const fallback = [
+        { word:'accommodation', phonetic:'/əˌkɒməˈdeɪʃn/', meaning:'住处；住宿', exampleEn:'The hotel provides accommodation for guests.', exampleCn:'这家酒店为客人提供住宿。', emoji:'🏨', hint:'想象酒店为客人提供住宿。' },
+        { word:'advertisement', phonetic:'/ədˈvɜːtɪsmənt/', meaning:'广告', exampleEn:'I saw an advertisement on TV.', exampleCn:'我在电视上看到一则广告。', emoji:'📺', hint:'广告会吸引我们的注意。' },
+        { word:'celebrate', phonetic:'/ˈselɪbreɪt/', meaning:'庆祝', exampleEn:'We celebrate Christmas every year.', exampleCn:'我们每年都庆祝圣诞节。', emoji:'🎉', hint:'庆祝时大家会一起欢笑。' },
+        { word:'vehicle', phonetic:'/ˈviːəkl/', meaning:'车辆；交通工具', exampleEn:'Bicycles are also considered vehicles.', exampleCn:'自行车也被视为一种交通工具。', emoji:'🚗', hint:'车辆帮助我们出行。' },
+        { word:'rescue', phonetic:'/ˈreskjuː/', meaning:'营救；救援', exampleEn:'They rescued the lost hikers.', exampleCn:'他们营救了迷路的徒步者。', emoji:'🛟', hint:'救援是在别人需要帮助时伸出援手。' },
+        { word:'opportunity', phonetic:'/ˌɒpəˈtjuːnəti/', meaning:'机会', exampleEn:'This is a great opportunity to learn.', exampleCn:'这是一个学习的好机会。', emoji:'🚪', hint:'机会像一扇打开的门。' }
+      ];
+      addCandidates(fallback.map((item, index) => ({ ...item, id: `fallback-${index}`, notebookId: book.id, status:'new', reviewCount:0, lastReview:0, nextReview:0, errorCount:0, createdAt: Date.now() + index })));
+      const selected = candidates.slice(0, 6);
+      const mockWords = [];
+      for (const [index, source] of selected.entries()) {
+        const { id: sourceId, ...sourceData } = source;
+        const mock = await DB.put('words', { ...sourceData, notebookId: Number(book.id), testMock: TEST_DATA_MARK, status:'learning', reviewCount:0, lastReview: dateStart(TEST_DATE) - 86400000, nextReview: dateStart(TEST_DATE), errorCount: index === 1 ? 1 : 0, createdAt: Date.now() + index });
+        mockWords.push(mock);
+      }
+      const ids = mockWords.map(word => word.id);
+      const currentLog = { date: TEST_DATE, notebookId: Number(book.id), testMock: TEST_DATA_MARK, wordsStudied:[], wordsReviewed:[], extraWordsStudied:[], plannedNew:[], plannedReview:ids.slice(0, Math.min(3, ids.length)), plannedExtraNew:[], dailyNew:State.settings.dailyNew, dailyReview:State.settings.dailyReview, coinsEarned:0, durationMinutes:0, completed:false, weeklyTestCompleted:false, weeklyTestMeaningScore:0, weeklyTestSpellingScore:0 };
+      await DB.put('dailyLog', currentLog);
+      const previousDate = dateKeyFromDate(new Date(dateStart(TEST_DATE) - 7 * 86400000));
+      await DB.put('dailyLog', { date:previousDate, notebookId:Number(book.id), testMock:TEST_DATA_MARK, wordsStudied:ids, wordsReviewed:[], extraWordsStudied:[], plannedNew:ids, plannedReview:[], plannedExtraNew:[], dailyNew:State.settings.dailyNew, dailyReview:State.settings.dailyReview, coinsEarned:0, durationMinutes:5, completed:true, weeklyTestCompleted:false, weeklyTestMeaningScore:0, weeklyTestSpellingScore:0 });
+      State.words = await DB.all('words');
+      State.logs = await DB.all('dailyLog');
+      State.showGuide = false;
+    }
+
+    /** 退出测试模式并返回正式网址。 */
+    async function exitTestMode() {
+      await cleanupTestScenario();
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.search = '';
+      cleanUrl.hash = '#/learn';
+      window.location.href = cleanUrl.href;
     }
 
     /** 将日期对应的学习计划固定下来，避免完成一词后任务顺序漂移。 */
@@ -729,7 +825,7 @@
     /* ==================== 路由与页面 ==================== */
     const Router = {
       navigate(path) { window.location.hash = path; },
-      resolve() { const freshToday = todayKey(); if (State.today !== freshToday) { State.today = freshToday; ensureDailyLog().then(() => render()); } const route = window.location.hash.replace('#', '') || '/learn'; State.route = ['/learn','/words','/profile','/admin','/test'].includes(route) ? route : '/learn'; State.currentUser = 'child'; render(); }
+      resolve() { const freshToday = TEST_MODE ? TEST_DATE : todayKey(); if (State.today !== freshToday) { State.today = freshToday; ensureDailyLog().then(() => render()); } const route = window.location.hash.replace('#', '') || '/learn'; State.route = ['/learn','/words','/profile','/admin','/test'].includes(route) ? route : '/learn'; State.currentUser = 'child'; render(); }
     };
     function isAdminSession() { const expiry = Number(localStorage.getItem('petAdminSession') || 0); return expiry > Date.now(); }
     function navBar() { const current = State.route; const toolActive = current === '/admin'; return `<nav class="nav-bar" aria-label="主导航"><button class="nav-item ${current === '/learn' ? 'active' : ''}" data-action="navigate" data-path="/learn"><span class="nav-icon">📖</span><span>学习</span></button><button class="nav-item ${current === '/words' ? 'active' : ''}" data-action="navigate" data-path="/words"><span class="nav-icon">📋</span><span>词库</span></button><button class="nav-item ${toolActive && State.adminTab === 'add' ? 'active' : ''}" data-action="open-admin-tab" data-tab="add"><span class="nav-icon">➕</span><span>录入</span></button><button class="nav-item ${toolActive && State.adminTab === 'overview' ? 'active' : ''}" data-action="open-admin-tab" data-tab="overview"><span class="nav-icon">📊</span><span>看板</span></button><button class="nav-item ${current === '/profile' ? 'active' : ''}" data-action="navigate" data-path="/profile"><span class="nav-icon">👤</span><span>我的</span></button></nav>`; }
@@ -941,9 +1037,9 @@
       const progress = `${test.index + 1} / ${test.ids.length}`;
       if (test.stage === 'meaning') {
         if (!test.choices) test.choices = makeQuiz(word);
-        return `<section class="screen"><div class="learn-top exit-row"><button class="btn btn-ghost" data-action="exit-weekly-test">← 退出</button><span class="step-label">周五检测 · 意思</span><span class="badge orange">${progress}</span></div><article class="card quiz-card"><div class="eyebrow">第一项：知道意思</div><h2 style="margin-top:8px">${escapeHtml(word.word)} 是什么意思？</h2><div class="quiz-visual">${visualBlock(word, 'visual-word')}<div class="quiz-word">${escapeHtml(word.word)}</div></div><div class="quiz-options">${test.choices.map((choice, index) => { const isCorrect = choice === quizMeaning(word); const cls = test.correct !== null && isCorrect ? 'correct' : test.selected === choice && test.correct === false ? 'wrong' : ''; return `<button class="quiz-option ${cls}" data-action="weekly-meaning-answer" data-choice="${escapeHtml(choice)}" ${test.correct !== null ? 'disabled' : ''}><span class="option-letter">${String.fromCharCode(65 + index)}</span><span>${escapeHtml(choice)}</span>${isCorrect && test.correct !== null ? '<span style="margin-left:auto">✓</span>' : ''}</button>`; }).join('')}</div><div class="quiz-feedback ${test.correct === true ? 'feedback-good' : test.correct === false ? 'feedback-bad' : ''}">${test.correct === true ? '回答正确！进入拼写检测。' : test.correct === false ? `正确答案是“${escapeHtml(quizMeaning(word))}”，记住它，再进入拼写。` : '请选择一个答案'}</div>${test.correct !== null ? '<button class="btn btn-primary btn-block" style="margin-top:12px" data-action="weekly-meaning-continue">进入拼写 →</button>' : ''}</article></section>`;
+        return `<section class="screen"><div class="learn-top exit-row"><button class="btn btn-ghost" data-action="exit-weekly-test">← 退出</button><span class="step-label">周五检测 · 意思</span><span class="badge orange">${progress}</span></div><article class="card quiz-card"><div class="eyebrow">第一项：知道意思</div><h2 style="margin-top:8px">${escapeHtml(word.word)} 是什么意思？</h2><div class="quiz-visual">${visualBlock(word, 'visual-word')}<div class="quiz-word">${escapeHtml(word.word)}</div></div><div class="quiz-options">${test.choices.map((choice, index) => { const isCorrect = choice === quizMeaning(word); const cls = test.correct !== null && isCorrect ? 'correct' : test.selected === choice && test.correct === false ? 'wrong' : ''; return `<button class="quiz-option ${cls}" data-action="weekly-meaning-answer" data-choice="${escapeHtml(choice)}" onclick="window.__XIXI_WEEKLY_ANSWER__(event, this.getAttribute('data-choice'))" ${test.correct !== null ? 'disabled' : ''}><span class="option-letter">${String.fromCharCode(65 + index)}</span><span>${escapeHtml(choice)}</span>${isCorrect && test.correct !== null ? '<span style="margin-left:auto">✓</span>' : ''}</button>`; }).join('')}</div><div class="quiz-feedback ${test.correct === true ? 'feedback-good' : test.correct === false ? 'feedback-bad' : ''}">${test.correct === true ? '回答正确！进入拼写检测。' : test.correct === false ? `正确答案是“${escapeHtml(quizMeaning(word))}”，记住它，再进入拼写。` : '请选择一个答案'}</div>${test.correct !== null ? '<button class="btn btn-primary btn-block" style="margin-top:12px" data-action="weekly-meaning-continue" onclick="window.__XIXI_WEEKLY_CONTINUE__(event)">进入拼写 →</button>' : ''}</article></section>`;
       }
-      return `<section class="screen"><div class="learn-top exit-row"><button class="btn btn-ghost" data-action="exit-weekly-test">← 退出</button><span class="step-label">周五检测 · 拼写</span><span class="badge orange">${progress}</span></div><article class="card spell-card"><div class="eyebrow">第二项：完成拼写</div><h2 style="margin-top:8px;text-align:center">请拼写这个单词</h2><div class="spell-prompt"><div class="meaning-large">${escapeHtml(word.meaning)}</div>${word.exampleEn ? `<div class="spell-example">${highlightBlank(word.exampleEn, word.word)}</div>` : ''}<div class="phonetic" style="margin-top:12px">${escapeHtml(word.phonetic || '')}</div></div>${test.spellCorrect ? '<div class="success-icon" style="font-size:55px">✅</div><h3 style="text-align:center;color:var(--success);margin-top:8px">拼写正确</h3><button class="btn btn-success btn-block" style="margin-top:20px" data-action="weekly-next-word">下一个 →</button>' : `<input class="input spell-input ${test.spellError ? 'error' : ''}" data-input="weekly-spell" value="${escapeHtml(test.spellValue)}" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="输入英文单词" aria-label="周测拼写答案"><button class="btn btn-primary btn-block" style="margin-top:14px" data-action="weekly-check-spell">检查拼写</button>${test.spellError ? `<div class="compare">${compareSpelling(test.spellValue, word.word)}</div><div class="feedback-bad" style="text-align:center;margin-top:11px;font-weight:800">还差一点，再试一次。</div>` : '<div class="muted tiny" style="text-align:center;margin-top:13px">必须拼写正确才能通过这个词。</div>'}`}</article></section>`;
+      return `<section class="screen"><div class="learn-top exit-row"><button class="btn btn-ghost" data-action="exit-weekly-test">← 退出</button><span class="step-label">周五检测 · 拼写</span><span class="badge orange">${progress}</span></div><article class="card spell-card"><div class="eyebrow">第二项：完成拼写</div><h2 style="margin-top:8px;text-align:center">请拼写这个单词</h2><div class="spell-prompt"><div class="meaning-large">${escapeHtml(word.meaning)}</div>${word.exampleEn ? `<div class="spell-example">${highlightBlank(word.exampleEn, word.word)}</div>` : ''}<div class="phonetic" style="margin-top:12px">${escapeHtml(word.phonetic || '')}</div></div>${test.spellCorrect ? '<div class="success-icon" style="font-size:55px">✅</div><h3 style="text-align:center;color:var(--success);margin-top:8px">拼写正确</h3><button class="btn btn-success btn-block" style="margin-top:20px" data-action="weekly-next-word" onclick="window.__XIXI_WEEKLY_NEXT__(event)">下一个 →</button>' : `<input class="input spell-input ${test.spellError ? 'error' : ''}" data-input="weekly-spell" value="${escapeHtml(test.spellValue)}" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="输入英文单词" aria-label="周测拼写答案"><button class="btn btn-primary btn-block" style="margin-top:14px" data-action="weekly-check-spell" onclick="window.__XIXI_WEEKLY_CHECK__(event)">检查拼写</button>${test.spellError ? `<div class="compare">${compareSpelling(test.spellValue, word.word)}</div><div class="feedback-bad" style="text-align:center;margin-top:11px;font-weight:800">还差一点，再试一次。</div>` : '<div class="muted tiny" style="text-align:center;margin-top:13px">必须拼写正确才能通过这个词。</div>'}`}</article></section>`;
     }
     async function completeWeeklyTest() {
       const test = State.weeklyTest;
@@ -972,6 +1068,46 @@
       test.spellCorrect = false;
       renderWeeklyTest();
     }
+    /* 周测按钮同时保留直接触控入口；iPad Safari 在复杂页面重绘后更稳定。 */
+    window.__XIXI_WEEKLY_ANSWER__ = (event, choice) => {
+      event?.preventDefault(); event?.stopPropagation();
+      const test = State.weeklyTest; const word = weeklyCurrentWord();
+      if (!test || test.correct !== null || !word) return;
+      test.selected = choice; test.correct = choice === quizMeaning(word); if (test.correct) test.meaningScore++;
+      renderWeeklyTest();
+    };
+    window.__XIXI_WEEKLY_CONTINUE__ = (event) => {
+      event?.preventDefault(); event?.stopPropagation();
+      if (!State.weeklyTest) return;
+      State.weeklyTest.stage = 'spelling'; State.weeklyTest.spellValue = ''; State.weeklyTest.spellError = false; State.weeklyTest.spellCorrect = false;
+      renderWeeklyTest(); setTimeout(() => $('[data-input="weekly-spell"]')?.focus(), 60);
+    };
+    window.__XIXI_WEEKLY_CHECK__ = (event) => {
+      event?.preventDefault(); event?.stopPropagation();
+      const test = State.weeklyTest; const word = weeklyCurrentWord(); if (!test || !word) return;
+      const answer = normalizeWord(test.spellValue || '');
+      if (answer === normalizeWord(word.word)) { test.spellCorrect = true; if (test.spellingAttempts === 0) test.spellingScore++; Speaker.speakCorrect(word); }
+      else { test.spellingAttempts++; test.spellError = true; }
+      renderWeeklyTest();
+    };
+    window.__XIXI_WEEKLY_NEXT__ = (event) => {
+      event?.preventDefault(); event?.stopPropagation(); void advanceWeeklyTest();
+    };
+    /** 兼容触摸设备和自动化点击落在按钮内层文字节点的情况。 */
+    function resolveActionTarget(event) {
+      const origin = event?.target;
+      return origin?.closest?.('[data-action]') || origin?.parentElement?.closest?.('[data-action]') || origin?.parentNode?.closest?.('[data-action]') || null;
+    }
+    /* 捕获阶段再接一层周测处理，避免重绘后事件代理被其他控件提前截断。 */
+    document.addEventListener('click', (event) => {
+      const target = resolveActionTarget(event);
+      if (!target || !['weekly-meaning-answer', 'weekly-meaning-continue', 'weekly-check-spell', 'weekly-next-word'].includes(target.dataset.action)) return;
+      event.preventDefault(); event.stopImmediatePropagation();
+      if (target.dataset.action === 'weekly-meaning-answer') window.__XIXI_WEEKLY_ANSWER__(event, target.dataset.choice);
+      if (target.dataset.action === 'weekly-meaning-continue') window.__XIXI_WEEKLY_CONTINUE__(event);
+      if (target.dataset.action === 'weekly-check-spell') window.__XIXI_WEEKLY_CHECK__(event);
+      if (target.dataset.action === 'weekly-next-word') window.__XIXI_WEEKLY_NEXT__(event);
+    }, true);
 
     /** 个人页提供每日新词和复习数量的可视化设置。 */
     function renderProfile() {
@@ -1216,7 +1352,7 @@
 
     /* ==================== 交互事件 ==================== */
     document.addEventListener('click', async (event) => {
-      const target = event.target.closest('[data-action]'); if (!target) return; const action = target.dataset.action;
+      const target = resolveActionTarget(event); if (!target) return; const action = target.dataset.action;
       if (action === 'navigate') { Router.navigate(target.dataset.path); return; }
       if (action === 'open-word-card') { const word = State.words.find(item => item.id === Number(target.dataset.id)); if (word) { State.selectedWordId = word.id; render(); } return; }
       if (action === 'close-word-card') { State.selectedWordId = null; render(); return; }
@@ -1226,6 +1362,7 @@
       if (action === 'next-guide') { if (State.guidePage < 2) { State.guidePage++; render(); } else setGuideSeen(); return; }
       if (action === 'start-task') { await startTask(target.dataset.type); return; }
       if (action === 'add-extra-study') { await addExtraStudy(target.dataset.count); return; }
+      if (action === 'exit-test-mode') { await exitTestMode(); return; }
       if (action === 'start-weekly-test') { startWeeklyTest(); return; }
       if (action === 'exit-weekly-test') { if (confirm('确定退出本次周测吗？已完成的项目会在本次检测结束后记录。')) { State.weeklyTest = null; Router.navigate('/learn'); } return; }
       if (action === 'weekly-meaning-answer') { const test = State.weeklyTest; const word = weeklyCurrentWord(); if (!test || test.correct !== null || !word) return; test.selected = target.dataset.choice; test.correct = target.dataset.choice === quizMeaning(word); if (test.correct) test.meaningScore++; renderWeeklyTest(); return; }
@@ -1300,7 +1437,7 @@
     /* ==================== 希币成长、单词卡与儿童界面增强 ==================== */
     /** 返回一个可用于成长统计的日期键集合；只把真正学习过的日期算作打卡日。 */
     function studyDaySet() {
-      return new Set(State.logs.filter(log => log.completed || (log.wordsStudied || []).length || (log.wordsReviewed || []).length || (log.coinsEarned || 0) > 0).map(log => log.date));
+      return new Set(State.logs.filter(log => log.testMock !== TEST_DATA_MARK && (log.completed || (log.wordsStudied || []).length || (log.wordsReviewed || []).length || (log.coinsEarned || 0) > 0)).map(log => log.date));
     }
     function dateKeyFromDate(date) { return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`; }
     function streakInfo() {
@@ -1330,7 +1467,7 @@
     }
     function growthStats() {
       const streak = streakInfo(); const week = weekStats();
-      return { coins: Number(State.settings.coins || 0), todayCoins: currentLog()?.coinsEarned || 0, weekCoins: week.coins, studied: unique(State.logs.flatMap(log => log.wordsStudied || [])).length, streak: streak.current, longestStreak: streak.longest, week };
+      return { coins: Number(State.settings.coins || 0), todayCoins: currentLog()?.testMock === TEST_DATA_MARK ? 0 : (currentLog()?.coinsEarned || 0), weekCoins: week.coins, studied: unique(State.logs.filter(log => log.testMock !== TEST_DATA_MARK).flatMap(log => log.wordsStudied || [])).length, streak: streak.current, longestStreak: streak.longest, week };
     }
     /** 完成新词拼写时只为这个词发放一次希币，重复复习不会刷分。 */
     async function finishWord() {
@@ -1405,10 +1542,15 @@
       const body = State.adminTab === 'overview' ? renderAdminOverview() : State.adminTab === 'add' ? renderAdminAdd() : State.adminTab === 'manage' ? renderAdminManage() : renderAdminBackup();
       return `<section class="screen admin-screen"><header class="topbar"><div class="brand-lockup"><div class="brand-mark">🪙</div><div><div class="brand-title">成长与工具</div><div class="brand-subtitle">希希词语家 · ${State.words.length} 个词</div></div></div><button class="icon-btn" data-action="navigate" data-path="/learn" aria-label="返回学习">←</button></header><nav class="admin-nav"><button class="admin-tab ${State.adminTab === 'overview' ? 'active' : ''}" data-action="admin-tab" data-tab="overview">🪙 个人成长榜</button><button class="admin-tab ${State.adminTab === 'add' ? 'active' : ''}" data-action="admin-tab" data-tab="add">➕ 录入词库</button><button class="admin-tab ${State.adminTab === 'manage' ? 'active' : ''}" data-action="admin-tab" data-tab="manage">📚 管理词库</button><button class="admin-tab ${State.adminTab === 'backup' ? 'active' : ''}" data-action="admin-tab" data-tab="backup">💾 备份恢复</button></nav>${body}${State.importPayload ? renderImportModal() : ''}${navBar()}</section>`;
     }
+    /** 测试模式提示条：明确告知临时数据范围，并提供一键清理入口。 */
+    function renderTestModeBanner() {
+      if (!TEST_MODE) return '';
+      return `<section class="card card-pad" style="margin:12px 12px 0;border:2px solid #ffd180;background:#fff8e8"><div class="row between wrap" style="gap:12px"><div><div class="eyebrow" style="color:var(--warning)">🧪 测试模式</div><h3 style="margin-top:6px">已准备复习和周五检测数据</h3><p class="muted small" style="margin-top:6px">模拟日期：${escapeHtml(TEST_DATE)}。这里的临时记录不会计入正式学习，退出后会自动清除。</p></div><button class="btn btn-secondary" data-action="exit-test-mode">退出测试</button></div></section>`;
+    }
     function render() {
       const app = $('#app'); if (!app) return; let html = '';
       if (State.route === '/learn') html = renderDashboard(); if (State.route === '/words') html = renderWords(); if (State.route === '/profile') html = renderProfile(); if (State.route === '/admin') html = renderAdmin(); if (State.route === '/test') html = renderWeeklyTest();
-      app.innerHTML = html; if (State.selectedWordId && State.route !== '/test') app.insertAdjacentHTML('beforeend', renderWordCardModal()); if (State.showGuide && State.route !== '/admin' && State.route !== '/test' && !State.selectedWordId) renderGuide(); drawChart();
+      app.innerHTML = html; if (TEST_MODE) app.insertAdjacentHTML('afterbegin', renderTestModeBanner()); if (State.selectedWordId && State.route !== '/test') app.insertAdjacentHTML('beforeend', renderWordCardModal()); if (State.showGuide && State.route !== '/admin' && State.route !== '/test' && !State.selectedWordId) renderGuide(); drawChart();
     }
 
     /* ==================== 动画与启动 ==================== */
@@ -2552,8 +2694,9 @@
       const masteredFallback = notebookWords(bookId).filter(word => word.status === 'mastered' && !usedReview.has(word.id) && !due.some(item => item.id === word.id)).sort((a, b) => (a.lastReview || 0) - (b.lastReview || 0));
       let plannedNew = settingsMatch ? currentNew : unique([...completedNew, ...currentNew]);
       let plannedReview = settingsMatch ? currentReview : unique([...completedReview, ...currentReview]);
-      if (!log || !settingsMatch || (!plannedNew.length && !completedNew.length && availableNew.length)) plannedNew = unique([...plannedNew, ...availableNew.slice(0, Math.max(0, State.settings.dailyNew - plannedNew.length)).map(word => word.id)]);
-      if (!log || !settingsMatch || (!plannedReview.length && !completedReview.length && (due.length || masteredFallback.length))) plannedReview = unique([...plannedReview, ...[...due, ...masteredFallback].slice(0, Math.max(0, State.settings.dailyReview - plannedReview.length)).map(word => word.id)]);
+      /* 测试模式使用 prepareTestScenario 已经固定好的计划，不再混入真实新词或复习词。 */
+      if (!TEST_MODE && (!log || !settingsMatch || (!plannedNew.length && !completedNew.length && availableNew.length))) plannedNew = unique([...plannedNew, ...availableNew.slice(0, Math.max(0, State.settings.dailyNew - plannedNew.length)).map(word => word.id)]);
+      if (!TEST_MODE && (!log || !settingsMatch || (!plannedReview.length && !completedReview.length && (due.length || masteredFallback.length)))) plannedReview = unique([...plannedReview, ...[...due, ...masteredFallback].slice(0, Math.max(0, State.settings.dailyReview - plannedReview.length)).map(word => word.id)]);
       const nextLog = { ...(log || {}), date: State.today, notebookId: bookId, wordsStudied: completedNew, wordsReviewed: completedReview, extraWordsStudied: completedExtra, plannedNew, plannedReview, plannedExtraNew: currentExtra, dailyNew: State.settings.dailyNew, dailyReview: State.settings.dailyReview, coinsEarned: log?.coinsEarned || 0, durationMinutes: log?.durationMinutes || 0, completed: (plannedNew.length + plannedReview.length > 0) && completedNew.length >= plannedNew.length && completedReview.length >= plannedReview.length, weeklyTestCompleted: log?.weeklyTestCompleted || false, weeklyTestMeaningScore: log?.weeklyTestMeaningScore || 0, weeklyTestSpellingScore: log?.weeklyTestSpellingScore || 0 };
       if (log?.id !== undefined) nextLog.id = log.id;
       await DB.put('dailyLog', nextLog); State.logs = await DB.all('dailyLog'); return nextLog;
