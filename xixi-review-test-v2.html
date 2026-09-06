@@ -321,7 +321,7 @@
       feedbackType: 'info',
       spelling: '',
       spellStatus: '',
-      hintUsed: false,
+      hintLevel: 0,
       attempts: 0,
       totalWrong: 0,
       startedAt: 0
@@ -366,7 +366,7 @@
       state.feedbackType = 'info';
       state.spelling = '';
       state.spellStatus = '';
-      state.hintUsed = false;
+      state.hintLevel = 0;
       state.attempts = 0;
       state.totalWrong = 0;
       state.startedAt = Date.now();
@@ -386,7 +386,7 @@
       state.index = 0;
       state.spelling = '';
       state.spellStatus = '';
-      state.hintUsed = false;
+      state.hintLevel = 0;
       state.attempts = 0;
       state.feedback = '';
       render();
@@ -448,11 +448,10 @@
       if (state.spellStatus !== 'correct') focusSpellingInput();
     }
 
-    /** 给出一个首字母提示，不直接泄露完整答案。 */
+    /** 两级拼写提示：第一次给首字母，第二次给出完整正确拼写。 */
     function showHint() {
-      state.hintUsed = true;
-      state.feedback = `提示：第一个字母是 “${currentWords()[state.index].word[0]}”，共 ${currentWords()[state.index].word.length} 个字母。`;
-      state.feedbackType = 'info';
+      if (state.hintLevel >= 2) return;
+      state.hintLevel += 1;
       render();
       focusSpellingInput();
     }
@@ -468,7 +467,7 @@
       state.index += 1;
       state.spelling = '';
       state.spellStatus = '';
-      state.hintUsed = false;
+      state.hintLevel = 0;
       state.attempts = 0;
       state.feedback = '';
       state.feedbackType = 'info';
@@ -589,11 +588,11 @@
               <input id="spelling-input" class="spell-input ${inputClass}" value="${escapeHtml(state.spelling)}" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="输入英文单词" aria-label="输入英文单词">
               <button class="btn" data-action="check-spelling" ${completed ? 'disabled' : ''}>检查答案</button>
             </div>
-            <div class="hint">${state.hintUsed ? `提示：首字母是 “${escapeHtml(word.word[0])}”，共 ${word.word.length} 个字母。` : ''}</div>
+            <div class="hint">${state.hintLevel === 1 ? `提示：首字母是 “${escapeHtml(word.word[0])}”，共 ${word.word.length} 个字母。` : state.hintLevel >= 2 ? `正确拼写是 “${escapeHtml(word.word)}”。` : ''}</div>
             <div class="feedback ${state.feedbackType}">${escapeHtml(state.feedback)}</div>
             <div class="attempt-note">拼写错误不会跳过，必须正确后才能进入下一个单词。</div>
             <div class="actions">
-              <button class="btn secondary" data-action="hint" ${state.hintUsed || completed ? 'disabled' : ''}>💡 提示</button>
+              <button class="btn secondary" data-action="hint" ${state.hintLevel >= 2 || completed ? 'disabled' : ''}>💡 提示 ${state.hintLevel ? `(${state.hintLevel}/2)` : ''}</button>
               <button class="btn" data-action="speak">🔊 听发音</button>
               <button class="btn success" data-action="next-spelling" ${completed ? '' : 'disabled'}>${state.index === currentWords().length - 1 ? '完成本次测试' : '下一个 →'}</button>
             </div>
