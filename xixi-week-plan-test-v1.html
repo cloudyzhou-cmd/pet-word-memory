@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="希希词语家周计划测试">
+  <title>希希词语家 · 周计划测试版</title>
+  <style>
+    :root{--blue:#087ff5;--blue2:#eaf4ff;--green:#22b85a;--green2:#eafaf0;--orange:#ff9500;--orange2:#fff5e6;--red:#e5484d;--ink:#172033;--muted:#778198;--line:#e3e8f1;--bg:#f3f6fb;--card:#fff}
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",Arial,sans-serif;font-size:17px} button,input{font:inherit} button{min-height:48px;border:0;border-radius:14px;padding:0 18px;font-weight:800;cursor:pointer;touch-action:manipulation} button:active{transform:scale(.98)} button:disabled{opacity:.45;cursor:not-allowed}.app{width:min(980px,100%);margin:auto;padding:20px 18px 48px}.topbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:16px}.brand{font-size:clamp(25px,4vw,34px);font-weight:900}.version{font-size:13px;color:var(--blue);background:var(--blue2);padding:7px 10px;border-radius:999px;font-weight:800}.card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:22px;box-shadow:0 8px 30px rgba(30,50,90,.05);margin-bottom:16px}.hero{background:linear-gradient(135deg,#087ff5,#6348e8);color:white;border:0}.hero h1{font-size:clamp(27px,5vw,44px);margin:0 0 8px}.hero p{margin:0;opacity:.92}.row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.between{justify-content:space-between}.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:20px}.stat{background:rgba(255,255,255,.16);border-radius:16px;padding:14px}.stat strong{font-size:28px;display:block}.stat span{font-size:14px;opacity:.9}.section-title{font-size:22px;font-weight:900;margin:0}.muted{color:var(--muted)}.small{font-size:14px}.btn-blue{background:var(--blue);color:#fff}.btn-green{background:var(--green);color:#fff}.btn-orange{background:var(--orange);color:#fff}.btn-light{background:#eef2f8;color:var(--ink)}.btn-danger{background:#fff0f0;color:var(--red)}.btn-block{width:100%}.notice{background:var(--orange2);color:#9a5a00;border:1px solid #ffd28a;border-radius:15px;padding:13px 15px;line-height:1.55}.success{background:var(--green2);color:#16743b;border:1px solid #bcebc9;border-radius:15px;padding:13px 15px;line-height:1.55}.progress{height:13px;background:#e8edf4;border-radius:999px;overflow:hidden}.progress>i{display:block;height:100%;background:linear-gradient(90deg,#18bdf4,#5d4fe5);border-radius:inherit;transition:width .25s}.plan-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:16px}.plan-day{border:1px solid var(--line);border-radius:14px;padding:12px 8px;text-align:center;background:#fafcff}.plan-day.active{border-color:#83bdff;background:var(--blue2)}.plan-day.done{border-color:#9fe1b7;background:var(--green2)}.plan-day b{display:block;font-size:15px}.plan-day span{display:block;color:var(--muted);font-size:13px;margin-top:5px}.action-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:14px}.words{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}.word-chip{border-radius:999px;padding:7px 11px;background:#f1f5fb;color:#39445b;font-size:14px}.word-chip.studied{background:#def7e7;color:#16743b;font-weight:800}.word-chip.next{background:#fff1d8;color:#9a5a00;font-weight:800}.rules{display:grid;gap:10px;margin-top:14px}.rule{display:flex;gap:10px;line-height:1.5}.rule b{color:var(--blue)}.test-shell{max-width:760px;margin:0 auto}.test-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}.test-card{text-align:center}.visual{width:min(190px,55vw);height:min(190px,55vw);margin:18px auto;border-radius:32px;background:#f3f6fb;display:grid;place-items:center;font-size:92px}.quiz-word{font-size:clamp(32px,7vw,52px);font-weight:900}.meaning{font-size:clamp(25px,5vw,38px);font-weight:900;margin:20px 0}.options{display:grid;gap:11px;text-align:left;margin-top:20px}.option{width:100%;background:#fff;border:2px solid var(--line);color:var(--ink);text-align:left;display:flex;align-items:center;gap:12px}.option .letter{display:grid;place-items:center;width:34px;height:34px;background:#eef2f8;border-radius:10px;color:var(--muted)}.option.selected{border-color:var(--blue);background:#f4f9ff}.option.correct{border-color:var(--green);background:var(--green2)}.option.wrong{border-color:var(--red);background:#fff1f1}.feedback{min-height:28px;margin:14px 0;font-weight:800}.feedback.good{color:var(--green)}.feedback.bad{color:var(--red)}.spell-input{width:100%;height:68px;border:3px solid #a9cfff;border-radius:16px;text-align:center;font-size:30px;font-weight:800;outline:0}.spell-input.error{border-color:var(--red);background:#fff2f2}.hint{margin:14px 0;color:#a35c00;background:var(--orange2);border-radius:14px;padding:12px}.compare{margin-top:12px;color:var(--red)}.footer-note{text-align:center;color:var(--muted);font-size:13px;margin-top:24px}.hidden{display:none!important}@media(max-width:600px){.app{padding:14px 12px 34px}.card{padding:17px;border-radius:18px}.stat-grid{gap:7px}.stat{padding:10px 8px}.stat strong{font-size:23px}.plan-grid{gap:5px}.plan-day{padding:9px 3px}.plan-day b{font-size:13px}.plan-day span{font-size:11px}.action-grid{grid-template-columns:1fr}.topbar{align-items:flex-start}}
+  </style>
+</head>
+<body>
+  <main class="app" id="app"></main>
+  <script>
+    'use strict';
+    const TEST_KEY='xixi-week-plan-test-v1';
+    const WORDS=[
+      ['foggy','有雾的','🌫️'],['freezing','冰冻的','🧊'],['frost','霜','❄️'],['lightning','闪电','⚡'],['thunder','雷','⛈️'],['shower','阵雨','🌧️'],['thunderstorm','雷暴；雷暴雨','⛈️'],['snowstorm','暴风雪','🌪️'],['chilly','阴冷的；寒冷的','🥶'],['nippy','刺骨的；寒冷的','🥶'],
+      ['soaring','猛增的','📈'],['turning','转弯处','↪️'],['childhood','童年','🧒'],['steep','陡峭的','⛰️'],['punctual','准时的','⏰'],['engine','引擎；发动机','🚗'],['rescue','营救；救援','🛟'],['vehicle','车辆；交通工具','🚌'],['ambulance','救护车','🚑'],['annoying','令人恼怒的','😣'],
+      ['pour','倾泻；倾盆而下','🌧️'],['liquid','液体','💧'],['crossroad','十字路口','🚦'],['crash','碰撞；坠毁','💥'],['stuck','被困的','🪤'],['switch off','关闭；关掉','🔌'],['frozen','冻结的；冷冻的','🧊'],['manage to do sth.','设法做成某事','🏆'],['location','位置；地点','📍'],['signal','信号；暗号','📶']
+    ].map((x,i)=>({id:i+1,word:x[0],meaning:x[1],emoji:x[2],unit:7,lesson:1}));
+    const DAYS=['周一','周二','周三','周四','周五'];
+    const fresh=()=>({route:'home',day:1,skipped:[],studied:[],planIds:WORDS.map(w=>w.id),test:null});
+    let state=load();
+    function load(){try{const x=JSON.parse(localStorage.getItem(TEST_KEY));return x&&Array.isArray(x.planIds)?x:fresh()}catch{return fresh()}}
+    function save(){localStorage.setItem(TEST_KEY,JSON.stringify(state))}
+    function esc(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
+    function word(id){return WORDS.find(w=>w.id===id)}
+    function studiedCount(){return state.studied.length}
+    function remaining(){return WORDS.filter(w=>!state.studied.includes(w.id))}
+    function todayStatus(index){if(state.skipped.includes(index))return '已跳过';if(index<state.day-1)return '已完成';if(index===state.day-1)return '今天';return '待学习'}
+    function render(){document.getElementById('app').innerHTML=state.route==='test'?renderTest():renderHome();bind();window.scrollTo({top:0,behavior:'smooth'})}
+    function renderHome(){
+      const pct=Math.round(studiedCount()/30*100), canTest=studiedCount()===30;
+      const chips=WORDS.map(w=>`<span class="word-chip ${state.studied.includes(w.id)?'studied':w.id===remaining()[0]?.id?'next':''}">${w.emoji} ${esc(w.word)}</span>`).join('');
+      const days=DAYS.map((d,i)=>`<div class="plan-day ${i===state.day-1?'active':''} ${i<state.day-1&&!state.skipped.includes(i)?'done':''}"><b>${d}</b><span>${todayStatus(i)}</span></div>`).join('');
+      return `<div class="topbar"><div class="brand">希希词语家</div><span class="version">周计划测试 v1</span></div>
+        <section class="card hero"><h1>本周 Unit 7 · Lesson 1</h1><p>这是一版独立测试页，用来验证“周计划固定30词”。</p><div class="stat-grid"><div class="stat"><strong>${studiedCount()} / 30</strong><span>本周已学习</span></div><div class="stat"><strong>${30-studiedCount()}</strong><span>还需学习</span></div><div class="stat"><strong>${state.test?.done?'已完成':'未开始'}</strong><span>周五词测</span></div></div></section>
+        <section class="card"><div class="row between"><h2 class="section-title">周计划进度</h2><strong>${pct}%</strong></div><div class="progress" style="margin-top:12px"><i style="width:${pct}%"></i></div><div class="plan-grid">${days}</div><div class="notice" style="margin-top:16px">规则：周测固定测试本周锁定的30个词，不根据某一天的学习记录临时拼接。</div></section>
+        <section class="card"><h2 class="section-title">模拟学习进度</h2><p class="muted small">请按下面按钮模拟真实情况：周一学习6个 → 周二跳过 → 周三补学并学习12个。</p><div class="action-grid"><button class="btn-blue" data-action="study6">今天学习6个</button><button class="btn-orange" data-action="skip">今天跳过</button><button class="btn-green" data-action="catchup12">补学6个＋今天6个</button><button class="btn-light" data-action="study6">额外学习6个</button></div><div class="row" style="margin-top:12px"><button class="btn-danger" data-action="reset">重置本次测试</button><button class="btn-light" data-action="fill30">快速补齐到30个</button></div></section>
+        <section class="card"><div class="row between"><div><h2 class="section-title">本周锁定的30个单词</h2><p class="muted small">绿色表示已经学习，橙色表示下一个待学习词。</p></div><span class="version">Unit 7 / Lesson 1</span></div><div class="words">${chips}</div></section>
+        <section class="card"><h2 class="section-title">周测入口</h2><p class="muted">只有30个单词全部完成后才能开始周测，避免漏测或提前显示完成。</p>${canTest&&!state.test?.done?'<button class="btn-orange btn-block" data-action="start-test">开始周五词测（30个） →</button>':state.test?.done?'<div class="success">周测已完成。此次周测读取的是固定周计划30词。</div>':'<button class="btn-light btn-block" disabled>还差 '+(30-studiedCount())+' 个，暂不能开始周测</button>'}</section>
+        <section class="card"><h2 class="section-title">本版本验证点</h2><div class="rules"><div class="rule"><b>1</b><span>漏学一天不会改变本周30词，也不会把补学词排除在周测外。</span></div><div class="rule"><b>2</b><span>第二天学习12个时，系统连续取本周计划中下一个未学的12个。</span></div><div class="rule"><b>3</b><span>周测固定读取同一组30个词，先选释义，再逐个拼写。</span></div></div></section>
+        <div class="footer-note">独立测试数据只保存在本页面，不会影响正式版记录。</div>`;
+    }
+    function choices(w){const others=WORDS.filter(x=>x.id!==w.id).slice((w.id*3)%20,((w.id*3)%20)+3);return [w,...others].sort(()=>Math.random()-.5)}
+    function renderTest(){
+      const t=state.test,w=word(t.ids[t.index]),total=t.ids.length,progress=`${t.index+1} / ${total}`;
+      if(!w)return '<section class="test-shell"><div class="card test-card"><h1>周测完成 🎉</h1><p>30个单词已经全部完成意思和拼写测试。</p><button class="btn-blue" data-action="exit-test">返回周计划</button></div></section>';
+      if(t.stage==='meaning'){
+        const opts=t.options||choices(w);t.options=opts;
+        return `<div class="test-shell"><div class="test-head"><button class="btn-light" data-action="exit-test">← 退出</button><strong>周五词测 · ${progress}</strong></div><section class="card test-card"><div class="version">第一步：选择中文意思</div><div class="visual">${w.emoji}</div><div class="quiz-word">${esc(w.word)}</div><div class="options">${opts.map((x,i)=>`<button class="option ${t.selected===x.id?(t.correct?'correct':'wrong'):''}" data-action="meaning" data-id="${x.id}" ${t.correct?'disabled':''}><span class="letter">${String.fromCharCode(65+i)}</span><span>${esc(x.meaning)}</span>${t.correct&&x.id===w.id?'<b style="margin-left:auto">✓</b>':''}</button>`).join('')}</div><div class="feedback ${t.correct?'good':t.selected?'bad':''}">${t.correct?'答对了！点击继续拼写。':t.selected?'再想想，正确答案已经标绿。':'请选择一个答案。'}</div>${t.correct?'<button class="btn-blue btn-block" data-action="meaning-next">继续拼写 →</button>':''}</section></div>`;
+      }
+      const answer=w.word.toLowerCase(), hint=t.hint||'', correct=t.spellCorrect;
+      return `<div class="test-shell"><div class="test-head"><button class="btn-light" data-action="exit-test">← 退出</button><strong>周五词测 · ${progress}</strong></div><section class="card test-card"><div class="version">第二步：拼写英文</div><div class="visual">${w.emoji}</div><div class="meaning">${esc(w.meaning)}</div><input class="spell-input ${t.spellError?'error':''}" data-input="spell" value="${esc(t.value||'')}" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false" inputmode="latin" placeholder="输入英文单词"><div class="row" style="margin-top:14px"><button class="btn-light" data-action="hint" ${t.hintCount>=2||correct?'disabled':''}>💡 提示 ${t.hintCount?`(${t.hintCount}/2)`:''}</button><button class="btn-blue" data-action="check-spell" ${correct?'disabled':''}>检查拼写</button></div>${hint?`<div class="hint">${esc(hint)}</div>`:''}<div class="feedback ${correct?'good':t.spellError?'bad':''}">${correct?'拼写正确！点击进入下一个。':t.spellError?'还差一点，再试一次。':'提示只在你主动点击时出现。'}</div>${correct?'<button class="btn-green btn-block" data-action="next-word">下一个 →</button>':''}</section></div>`;
+    }
+    function bind(){
+      document.querySelectorAll('[data-action]').forEach(b=>b.addEventListener('click',()=>act(b.dataset.action,b.dataset)));
+      document.querySelector('[data-input="spell"]')?.addEventListener('input',e=>{state.test.value=e.target.value;state.test.spellError=false;save()});
+    }
+    function act(action,data){
+      if(action==='study6'){study(6);return}
+      if(action==='catchup12'){study(12);return}
+      if(action==='skip'){state.skipped.push(state.day-1);state.day=Math.min(5,state.day+1);save();render();return}
+      if(action==='fill30'){study(30-studiedCount());return}
+      if(action==='reset'){if(confirm('确定重置本次周计划测试吗？')){state=fresh();save();render()}return}
+      if(action==='start-test'){state.route='test';state.test={ids:state.planIds.slice(),index:0,stage:'meaning',options:null,selected:null,correct:false,meaningScore:0,value:'',hint:'',hintCount:0,spellError:false,spellCorrect:false};save();render();return}
+      if(action==='exit-test'){state.route='home';save();render();return}
+      if(action==='meaning'){const t=state.test,w=word(t.ids[t.index]);t.selected=Number(data.id);t.correct=t.selected===w.id;if(t.correct)t.meaningScore++;save();render();return}
+      if(action==='meaning-next'){state.test.stage='spelling';state.test.value='';state.test.hint='';state.test.hintCount=0;state.test.spellError=false;state.test.spellCorrect=false;save();render();return}
+      if(action==='hint'){const t=state.test,w=word(t.ids[t.index]);t.hintCount++;t.hint=t.hintCount===1?`首字母是“${w.word[0].toLowerCase()}”，共 ${w.word.length} 个字符。`:`正确拼写：${w.word}`;save();render();return}
+      if(action==='check-spell'){const t=state.test,w=word(t.ids[t.index]);if((t.value||'').trim().toLowerCase()===w.word.toLowerCase()){t.spellCorrect=true;t.spellError=false;t.spellingScore=(t.spellingScore||0)+1}else t.spellError=true;save();render();return}
+      if(action==='next-word'){const t=state.test;if(t.index>=t.ids.length-1){t.done=true;state.route='home'}else{t.index++;t.stage='meaning';t.options=null;t.selected=null;t.correct=false;t.value='';t.hint='';t.hintCount=0;t.spellError=false;t.spellCorrect=false}save();render();return}
+    }
+    function study(count){const ids=remaining().slice(0,count).map(w=>w.id);state.studied=[...new Set(state.studied.concat(ids))];if(ids.length&&state.day<5)state.day++;save();render()}
+    render();
+  </script>
+</body>
+</html>
