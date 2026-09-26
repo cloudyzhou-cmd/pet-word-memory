@@ -332,7 +332,7 @@
     ];
     /* 内置词库由用户提供的 PET 强化班 Markdown 资料整理而来。实际内容在此处内嵌，更新网页无需联网补全。 */
     const PET_STRENGTH_BOOK_NAME = 'PET强化单词';
-    const APP_VERSION = '1.4.0';
+    const APP_VERSION = '1.5.0';
     /* 应用版本和数据结构版本严格分离：功能更新不应重建用户数据。 */
     const DATA_SCHEMA_VERSION = 3;
     const PET_STRENGTH_DATA_VERSION = 'pet-strength-unit-7-12-v1.2';
@@ -684,7 +684,7 @@
       route: '/learn', currentUser: 'child', today: TEST_MODE ? TEST_DATE : todayKey(), settings: { ...DEFAULT_SETTINGS }, words: [], logs: [], notebooks: [], activeNotebookId: null, legacyWordsPresent: false,
       currentTask: null, reviewFlow: null, guidePage: 0, showGuide: false, stageAReadyAt: 0, stageAFlipped: false, stageB: null, spell: null, weeklyTest: null, unitTest: null,
       adminTab: 'overview', adminLoggedIn: false, adminSearch: '', adminPage: 1, editingWordId: null, batchPreview: [], importPayload: null,
-      wordSearch: '', batchText: '', batchLookupRunning: false, batchEditIndex: null, batchSaveSummary: null, ocrStatus: '', ocrRunning: false, ocrQueue: [], selectedWordId: null, toastTimer: null, wordImageDraft: null, wordImageSource: null, wordImageTitle: '', imageStatus: '', notebookSearch: '', notebookEditingId: null, safetyReport: null
+      wordSearch: '', batchText: '', batchLookupRunning: false, batchEditIndex: null, batchSaveSummary: null, ocrStatus: '', ocrRunning: false, ocrQueue: [], selectedWordId: null, toastTimer: null, wordImageDraft: null, wordImageSource: null, wordImageTitle: '', imageStatus: '', notebookSearch: '', notebookEditingId: null, safetyReport: null, startPickerOpen: false, startPickerValue: ''
     };
 
     /** 读取数据健康摘要，只读，不修改学习数据。 */
@@ -3435,6 +3435,61 @@
       const meta = courseMeta(word);
       return meta.hasCourse ? 'Unit ' + meta.unit + (meta.lesson ? ' · Lesson ' + meta.lesson : '') : '学习单元 ' + sequence;
     }
+    /** 返回当前单词本中可选择的 Unit/Lesson 起点，顺序与词库课程顺序一致。 */
+    function learningStartOptionsV15(bookId = State.activeNotebookId) {
+      const seen = new Set();
+      const options = [];
+      for (const word of orderedBookWordsV12(bookId)) {
+        const meta = courseMeta(word);
+        if (!meta.hasCourse) continue;
+        const key = meta.unit + '|' + meta.lesson;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        options.push({ key, unit: meta.unit, lesson: meta.lesson, label: 'Unit ' + meta.unit + ' · Lesson ' + meta.lesson });
+      }
+      return options;
+    }
+    function learningStartSettingV15(bookId = State.activeNotebookId) {
+      const all = State.settings.learningStartByNotebook && typeof State.settings.learningStartByNotebook === 'object' ? State.settings.learningStartByNotebook : {};
+      return all[String(Number(bookId))] || null;
+    }
+    function learningStartIndexV15(bookId, setting, ordered = orderedBookWordsV12(bookId)) {
+      if (!setting) return -1;
+      const targetUnit = Number(setting.unit);
+      const targetLesson = Number(setting.lesson);
+      return ordered.findIndex(word => {
+        const meta = courseMeta(word);
+        return meta.hasCourse && (Number(meta.unit) > targetUnit || (Number(meta.unit) === targetUnit && Number(meta.lesson) >= targetLesson));
+      });
+    }
+    function learningStartKeyV15(setting) {
+      return setting ? Number(setting.unit) + '|' + Number(setting.lesson) : '';
+    }
+    /** 保存手动起点，仅改变未来的学习计划，不删除或改写历史日志。 */
+    async function saveLearningStartV15(bookId, key) {
+      const [unit, lesson] = String(key || '').split('|').map(Number);
+      if (!Number.isFinite(unit) || !Number.isFinite(lesson)) return false;
+      const all = State.settings.learningStartByNotebook && typeof State.settings.learningStartByNotebook === 'object' ? { ...State.settings.learningStartByNotebook } : {};
+      all[String(Number(bookId))] = { unit, lesson, key: unit + '|' + lesson, updatedAt: Date.now() };
+      State.settings.learningStartByNotebook = all;
+      await DB.put('settings', State.settings);
+      await ensureActiveUnitV13(bookId);
+      await ensureDailyLog();
+      return true;
+    }
+    function renderLearningPositionCardV15(bookId = State.activeNotebookId) {
+      const options = learningStartOptionsV15(bookId);
+      if (!options.length) return '';
+      const saved = learningStartSettingV15(bookId);
+      const plan = activeUnitPlanV13(bookId);
+      const display = plan ? unitPlanDisplayV13(plan, bookId) : { current: '即将开始' };
+      const selected = State.startPickerValue || saved?.key || (options[0] && options[0].key) || '';
+      const currentText = saved ? '已选择从 Unit ' + saved.unit + ' · Lesson ' + saved.lesson + ' 开始' : '当前续学位置：' + display.current;
+      if (!State.startPickerOpen) {
+        return '<section class="card card-pad learning-position-card"><div class="row between wrap" style="gap:12px"><div><div class="eyebrow">学习位置</div><h3 style="margin-top:6px">' + escapeHtml(currentText) + '</h3><p class="muted small" style="margin-top:6px">可以从任意 Unit/Lesson 开始，已有学习记录、积分和希币都会保留。</p></div><button type="button" class="btn btn-secondary" data-action="open-start-picker">选择起点</button></div></section>';
+      }
+      return '<section class="card card-pad learning-position-card"><div class="eyebrow">选择学习起点</div><h3 style="margin-top:7px">从哪个 Unit/Lesson 开始？</h3><p class="muted small" style="margin-top:6px">只调整后续学习位置，不会删除历史记录。</p><select class="input" style="margin-top:12px" data-input="learning-start-select" aria-label="选择学习起点">' + options.map(option => '<option value="' + escapeHtml(option.key) + '" ' + (option.key === selected ? 'selected' : '') + '>' + escapeHtml(option.label) + '</option>').join('') + '</select><div class="row" style="gap:10px;margin-top:12px"><button type="button" class="btn btn-secondary" style="flex:1" data-action="cancel-start-picker">取消</button><button type="button" class="btn btn-primary" style="flex:1" data-action="apply-start-picker">从这里开始</button></div></section>';
+    }
     async function ensureActiveUnitV13(bookId = State.activeNotebookId) {
       const numericBookId = Number(bookId || activeNotebook()?.id);
       if (!numericBookId) return null;
@@ -3451,12 +3506,27 @@
       const historicalStudied = new Set(State.logs.filter(log => sameNotebookLogV13(log, numericBookId) && dateStart(log.date) < dateStart(State.today)).flatMap(log => [...(log.wordsStudied || []), ...(log.extraWordsStudied || [])]));
       const historicalIndexes = ordered.map((word, index) => historicalStudied.has(word.id) ? index : -1).filter(index => index >= 0);
       const furthestHistoricalIndex = historicalIndexes.length ? Math.max(...historicalIndexes) : -1;
+      const manualStart = learningStartSettingV15(numericBookId);
+      const manualKey = learningStartKeyV15(manualStart);
+      const manualIndex = learningStartIndexV15(numericBookId, manualStart, ordered);
+      if (active && manualStart && unitPlanProgressV13(active, numericBookId).completed === 0 && active.startPointKey !== manualKey && manualIndex >= 0) {
+        const selectedWords = ordered.slice(manualIndex, manualIndex + UNIT_PLAN_SIZE_V13);
+        if (selectedWords.length) {
+          active.wordIds = selectedWords.map(word => word.id);
+          active.label = unitLabelV13(selectedWords[0], active.sequence);
+          active.startPointKey = manualKey;
+          active.status = 'active';
+          active.testAttempts = 0;
+          active.testResults = [];
+          changed = true;
+        }
+      }
       if (active && furthestHistoricalIndex >= 0) {
         const activeIndexes = active.wordIds.map(id => ordered.findIndex(word => word.id === id)).filter(index => index >= 0);
         const activeProgress = unitPlanProgressV13(active, numericBookId).completed;
         const activeStart = activeIndexes.length ? Math.min(...activeIndexes) : -1;
         /* 旧计划仍停在 Lesson 1、但历史记录已经学到更后面时，自动修复续学位置。 */
-        if (activeProgress === 0 && activeStart >= 0 && furthestHistoricalIndex >= activeStart && furthestHistoricalIndex + 1 < ordered.length) {
+        if (!manualStart && activeProgress === 0 && activeStart >= 0 && furthestHistoricalIndex >= activeStart && furthestHistoricalIndex + 1 < ordered.length) {
           const nextWords = ordered.slice(furthestHistoricalIndex + 1, furthestHistoricalIndex + 1 + UNIT_PLAN_SIZE_V13);
           if (nextWords.length) {
             active.wordIds = nextWords.map(word => word.id);
@@ -3464,6 +3534,7 @@
             active.status = 'active';
             active.testAttempts = 0;
             active.testResults = [];
+            active.startPointKey = '';
             changed = true;
           }
         }
@@ -3472,17 +3543,20 @@
         const history = new Set(plans.flatMap(plan => plan.wordIds || []));
         /* 没有旧单元计划时，跳过历史上已经学过的词，避免升级后重新回到 Lesson 1。 */
         const remaining = ordered.filter(word => !history.has(word.id) && !historicalStudied.has(word.id));
-        if (remaining.length) {
-          const first = remaining[0];
+        const manualWords = manualIndex >= 0 ? ordered.slice(manualIndex, manualIndex + UNIT_PLAN_SIZE_V13) : [];
+        const source = manualWords.length ? manualWords : remaining;
+        if (source.length) {
+          const first = source[0];
           active = {
             id: 'unit-' + numericBookId + '-' + (plans.length + 1),
             notebookId: numericBookId,
             sequence: plans.length + 1,
             label: unitLabelV13(first, plans.length + 1),
-            wordIds: remaining.slice(0, UNIT_PLAN_SIZE_V13).map(word => word.id),
+            wordIds: source.slice(0, UNIT_PLAN_SIZE_V13).map(word => word.id),
             status: 'active',
             testAttempts: 0,
             testResults: [],
+            startPointKey: manualKey,
             createdAt: Date.now()
           };
           plans.push(active);
@@ -3660,7 +3734,13 @@
       const planDisplay = plan ? unitPlanDisplayV13(plan, State.activeNotebookId) : { range: '准备下一个学习单元', current: '即将开始' };
       return '<section class="screen"><header class="topbar"><div class="brand-lockup"><div class="brand-mark">' + escapeHtml(book?.icon || '📚') + '</div><div><div class="brand-title">希希词语家</div><div class="brand-subtitle">当前学习：' + escapeHtml(book?.name || '单词本') + ' · V' + APP_VERSION + '</div></div></div></header><div class="stack">' + notebookSelector() + '<section class="card hero-card"><div class="eyebrow">当前单元学习进度</div><div class="hero-number">' + progress.completed + '<span> / ' + (progress.total || UNIT_PLAN_SIZE_V13) + ' 个词</span></div><div>' + escapeHtml(planDisplay.range) + ' · ' + escapeHtml(planDisplay.current) + ' · 周一到周日均可学习 🌱</div><div class="progress-track"><div class="progress-fill" style="width:' + percent + '%"></div></div><div class="progress-meta"><span>' + (progress.completed ? '已完成 ' + progress.completed + ' 个' : '今天也来学一点') + '</span><span>' + percent + '%</span></div></section><section class="card coin-hero"><div class="eyebrow">个人打卡榜 · 我的希币</div><div class="coin-number">' + growth.coins + '<span> 希币</span></div><div>积分 ' + growth.coins + ' 分 · 今天 +' + growth.todayCoins + ' 希币</div><button class="btn" style="margin-top:15px;color:#9a5600;background:#fff" data-action="open-admin-tab" data-tab="overview">查看成长榜 →</button></section><section class="stack"><div class="section-heading"><h2>今天学什么</h2><span class="badge ' + (dailyDone ? 'green' : 'blue') + '">' + (dailyDone ? '基础任务完成' : newDone + ' / ' + newWords.length) + '</span></div><article class="card task-card new-task"><div class="row between"><div class="task-icon">📘</div><span class="task-status ' + (newComplete ? '' : 'pending') + '">' + (newComplete ? '已完成 ✅' : '新词任务') + '</span></div><div><div class="task-title">今日新学 · ' + newWords.length + ' 个</div><div class="task-caption">' + (newWords.length ? '按单元顺序学习，完成拼写就能获得希币。' : '今天没有待学新词，或者当前单元已完成。') + '</div></div>' + (newWords.length ? '<div class="word-preview">' + newWords.map(word => escapeHtml(word.word)).join(' · ') + '</div>' : '') + newButton + '</article><article class="card task-card review-task ' + (!newComplete && reviewWords.length ? 'locked' : '') + '"><div class="row between"><div class="task-icon">📙</div><span class="task-status ' + (reviewComplete ? '' : newComplete ? 'pending' : 'lock') + '">' + (reviewComplete ? '已完成 ✅' : !newComplete ? '🔒 待解锁' : '复习任务') + '</span></div><div><div class="task-title">今日复习 · ' + reviewWords.length + ' 个</div><div class="task-caption">' + (!newComplete ? '完成今日新词后，就能开始复习啦。' : reviewWords.length ? '把学过的单词再叫醒一次。' : '今天没有到期复习词，轻松完成！') + '</div></div>' + reviewButton + '</article>' + extraBlock + '</section>' + renderWeeklyTestCard([]) + '</div>' + navBar() + '</section>';
     };
-    window.__XIXI_UNIT_PLAN__ = { version: '1.3.3', size: UNIT_PLAN_SIZE_V13, getActive: () => activeUnitPlanV13(), getPlans: () => unitPlansV13(), getProgress: plan => unitPlanProgressV13(plan), getDisplay: plan => unitPlanDisplayV13(plan) };
+    /* V1.5.0：在已验证的首页渲染结果中插入学习起点卡片，避免改动既有学习流程。 */
+    const previousRenderDashboardV15 = renderDashboard;
+    renderDashboard = function() {
+      const html = previousRenderDashboardV15();
+      return html.replace('</header><div class="stack">', '</header><div class="stack">' + renderLearningPositionCardV15(State.activeNotebookId));
+    };
+    window.__XIXI_UNIT_PLAN__ = { version: '1.5.0', size: UNIT_PLAN_SIZE_V13, getActive: () => activeUnitPlanV13(), getPlans: () => unitPlansV13(), getProgress: plan => unitPlanProgressV13(plan), getDisplay: plan => unitPlanDisplayV13(plan) };
     document.addEventListener('input', event => {
       if (event.target?.dataset?.input === 'unit-spell' && State.unitTest) {
         State.unitTest.spellValue = event.target.value;
@@ -3711,7 +3791,44 @@
       }
       if (action === 'unit-test-next') { if (test.stage === 'spelling' && test.spellCorrect) unitTestAdvanceV13(); }
     }, true);
-    window.__XIXI_WEEK_PLAN__ = { version: '1.3.3', size: UNIT_PLAN_SIZE_V13, getPlan: () => activeUnitPlanV13(), getProgress: () => unitPlanProgressV13(activeUnitPlanV13()) };
+    document.addEventListener('change', event => {
+      if (event.target?.dataset?.input !== 'learning-start-select') return;
+      State.startPickerValue = event.target.value || '';
+    }, true);
+    document.addEventListener('click', async event => {
+      const target = event.target.closest?.('[data-action]');
+      if (!target) return;
+      const action = target.dataset.action;
+      if (!['open-start-picker', 'cancel-start-picker', 'apply-start-picker'].includes(action)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (action === 'open-start-picker') {
+        const options = learningStartOptionsV15(State.activeNotebookId);
+        State.startPickerValue = learningStartSettingV15(State.activeNotebookId)?.key || options[0]?.key || '';
+        State.startPickerOpen = true;
+        render();
+        return;
+      }
+      if (action === 'cancel-start-picker') {
+        State.startPickerOpen = false;
+        State.startPickerValue = '';
+        render();
+        return;
+      }
+      if (action === 'apply-start-picker') {
+        const key = State.startPickerValue || target.closest('.learning-position-card')?.querySelector('[data-input="learning-start-select"]')?.value || '';
+        const plan = activeUnitPlanV13(State.activeNotebookId);
+        const progress = unitPlanProgressV13(plan, State.activeNotebookId);
+        const appliedNow = !plan || progress.completed === 0;
+        if (await saveLearningStartV15(State.activeNotebookId, key)) {
+          State.startPickerOpen = false;
+          State.startPickerValue = '';
+          render();
+          showToast(appliedNow ? '已从选择的 Unit/Lesson 开始，历史记录已保留。' : '已保存，将在当前单元完成后生效。');
+        }
+      }
+    }, true);
+    window.__XIXI_WEEK_PLAN__ = { version: '1.5.0', size: UNIT_PLAN_SIZE_V13, getPlan: () => activeUnitPlanV13(), getProgress: () => unitPlanProgressV13(activeUnitPlanV13()) };
     window.__XIXI_IMPORT_ENGINE__={version:IMPORT_ENGINE_VERSION,appVersion:APP_VERSION,parseBatchInput,extractVocabularyFromOcr,missingBatchFields,referenceDataFor,compareCourseOrder};
 
     init();
