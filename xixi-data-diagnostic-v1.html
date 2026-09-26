@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>希希词语家 · 数据诊断</title>
+  <style>
+    :root{--blue:#087ff5;--ink:#172033;--muted:#68758a;--bg:#f2f5fb;--card:#fff;--line:#dfe6f1;--good:#198754;--warn:#b66a00;--bad:#c73737}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","PingFang SC",sans-serif}
+    main{width:min(920px,100%);margin:0 auto;padding:22px 16px 46px}.hero{background:linear-gradient(135deg,#147df5,#5666ed);color:white;border-radius:24px;padding:24px 22px;box-shadow:0 12px 30px #2463d52b}.hero h1{margin:0;font-size:28px}.hero p{margin:8px 0 0;opacity:.9}.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}.btn{min-height:46px;border:0;border-radius:12px;padding:0 17px;font-size:16px;font-weight:800;background:var(--blue);color:#fff}.btn.secondary{background:#e8eef8;color:#1556a1}.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;margin:14px 0;box-shadow:0 5px 18px #243b6310}.card h2{font-size:20px;margin:0 0 13px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}.stat{border:1px solid var(--line);border-radius:14px;padding:13px}.stat strong{display:block;font-size:27px}.stat span{display:block;color:var(--muted);font-size:13px;margin-top:3px}.good{color:var(--good)}.warn{color:var(--warn)}.bad{color:var(--bad)}.muted{color:var(--muted)}.small{font-size:13px;line-height:1.6}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:12px}table{border-collapse:collapse;width:100%;min-width:650px;font-size:13px}th,td{text-align:left;padding:10px;border-bottom:1px solid var(--line);white-space:nowrap}th{background:#f7f9fc;color:#536179}tr:last-child td{border-bottom:0}.pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#edf3fc;color:#2861a7;margin:3px 4px 3px 0;font-size:12px}.notice{padding:13px 15px;border-radius:13px;background:#fff7e6;color:#7b4a00;line-height:1.65}.notice.good{background:#eaf8ef;color:#12683d}.notice.bad{background:#fff0f0;color:#9b2929}pre{white-space:pre-wrap;word-break:break-word;background:#101827;color:#dce7f6;border-radius:13px;padding:14px;font-size:12px;line-height:1.55;max-height:360px;overflow:auto}details summary{cursor:pointer;font-weight:800;min-height:44px;display:flex;align-items:center}footer{color:var(--muted);font-size:12px;line-height:1.6;margin-top:18px}
+  </style>
+</head>
+<body>
+<main>
+  <section class="hero"><h1>希希词语家 · 数据诊断</h1><p>只读检查，不会修改、迁移或删除任何学习数据。</p></section>
+  <div class="toolbar"><button class="btn" id="refresh">重新读取</button><button class="btn secondary" id="download">下载诊断报告</button></div>
+  <div id="app"><section class="card"><p>正在读取当前浏览器数据……</p></section></div>
+  <footer>请在孩子实际使用的同一个浏览器、同一个网址来源中打开本页面。不要使用“清除网站数据”。诊断报告不会包含家长密码。</footer>
+</main>
+<script>
+(() => {
+  'use strict';
+  const DB_NAME='PETWordDB';
+  const FALLBACK_KEY='PETWordDB_FALLBACK';
+  const $=s=>document.querySelector(s);
+  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const n=v=>Number.isFinite(Number(v))?Number(v):0;
+  const arr=v=>Array.isArray(v)?v:[];
+  const countIds=(logs,field)=>new Set(logs.flatMap(x=>arr(x[field]))).size;
+  const safeSettings=s=>{if(!s)return null;const x={...s};delete x.adminPassword;delete x.password;return x};
+  let latest=null;
+  function request(req){return new Promise((resolve,reject)=>{req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error||new Error('IndexedDB读取失败'))})}
+  function readStore(db,name){return db.objectStoreNames.contains(name)?request(db.transaction(name,'readonly').objectStore(name).getAll()):Promise.resolve([])}
+  function openDb(){return new Promise((resolve,reject)=>{if(!('indexedDB' in window))return reject(new Error('当前浏览器不支持 IndexedDB'));const r=indexedDB.open(DB_NAME);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error||new Error('无法打开 IndexedDB'))})}
+  async function read(){
+    const result={origin:location.origin||'file://',url:location.href,readAt:new Date().toISOString(),indexedDB:{available:'indexedDB' in window,opened:false,version:null,stores:[]},fallback:{present:false,keys:[]},words:[],logs:[],notebooks:[],settings:null,error:null};
+    try{const db=await openDb();result.indexedDB.opened=true;result.indexedDB.version=db.version;result.indexedDB.stores=Array.from(db.objectStoreNames);[result.words,result.logs,result.notebooks,result.settings]=await Promise.all([readStore(db,'words'),readStore(db,'dailyLog'),readStore(db,'notebooks'),readStore(db,'settings').then(x=>x.find(i=>i&&i.key==='config')||null)]);db.close()}catch(e){result.error=e.message}
+    try{const raw=localStorage.getItem(FALLBACK_KEY);result.fallback.present=Boolean(raw);result.fallback.keys=Object.keys(localStorage).filter(k=>k.startsWith('PETWordDB')||k.startsWith('pet'));if(raw){const x=JSON.parse(raw);result.fallback.wordCount=arr(x.words).length;result.fallback.logCount=arr(x.dailyLog).length;result.fallback.notebookCount=arr(x.notebooks).length;result.fallback.settings=safeSettings(Array.isArray(x.settings)?x.settings.find(i=>i?.key==='config'):x.settings)}}catch(e){result.fallback.error=e.message}
+    latest=result;render(result)
+  }
+  function render(r){
+    const logs=r.logs,words=r.words,books=r.notebooks,settings=r.settings||{};
+    const activeId=n(settings.activeNotebookId), active=books.find(b=>n(b.id)===activeId);
+    const studied=countIds(logs,'wordsStudied'), reviewed=countIds(logs,'wordsReviewed');
+    const conclusion=logs.length||n(settings.coins)||studied?'已读取到历史数据，下一步需要检查单词本和单元计划的关联。':'当前这个浏览器来源中没有读取到历史学习日志和积分；目前看到的更像是新建数据库。';
+    const conclusionClass=logs.length||n(settings.coins)||studied?'good':'bad';
+    const notebookRows=books.map(b=>{const ws=words.filter(w=>n(w.notebookId)===n(b.id));const ids=new Set(ws.map(w=>w.id));const ls=logs.filter(l=>!l.notebookId||n(l.notebookId)===n(b.id));return `<tr><td>${esc(b.icon||'📚')} ${esc(b.name||'未命名')}</td><td>${ws.length}</td><td>${ls.length}</td><td>${countIds(ls,'wordsStudied')}</td><td>${countIds(ls,'wordsReviewed')}</td><td>${n(b.id)===activeId?'当前':''}</td></tr>`}).join('')||'<tr><td colspan="6">没有单词本记录</td></tr>';
+    const logRows=[...logs].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,80).map(l=>`<tr><td>${esc(l.date||'')}</td><td>${esc(books.find(b=>n(b.id)===n(l.notebookId))?.name|| (l.notebookId==null?'未绑定单词本':'未知单词本'))}</td><td>${arr(l.wordsStudied).length}</td><td>${arr(l.wordsReviewed).length}</td><td>${arr(l.plannedNew).length}</td><td>${n(l.coinsEarned)}</td></tr>`).join('')||'<tr><td colspan="6">没有 dailyLog 记录</td></tr>';
+    const plans=settings.unitPlans||{};const planSummary=Object.entries(plans).flatMap(([bookId,list])=>arr(list).map(p=>`${books.find(b=>n(b.id)===n(bookId))?.name||'单词本 '+bookId} · ${p.label||p.id||'未命名'} · ${arr(p.wordIds).length}词 · 测试${n(p.testAttempts)}/2`));
+    const rawSafe={...r,settings:safeSettings(r.settings)};
+    $('#app').innerHTML=`<section class="card"><div class="notice ${conclusionClass}"><strong>初步判断：</strong>${esc(conclusion)}</div><p class="small muted">网址来源：${esc(r.origin)}<br>当前页面：${esc(r.url)}</p></section><section class="card"><h2>核心数据</h2><div class="grid"><div class="stat"><strong>${words.length}</strong><span>IndexedDB 单词总数</span></div><div class="stat"><strong>${books.length}</strong><span>单词本数量</span></div><div class="stat"><strong>${logs.length}</strong><span>学习日志数量</span></div><div class="stat"><strong>${studied}</strong><span>日志中学习过的词</span></div><div class="stat"><strong>${n(settings.coins)}</strong><span>希币</span></div><div class="stat"><strong>${active?esc(active.name):'未设置'}</strong><span>当前单词本</span></div></div></section><section class="card"><h2>单词本分布</h2><div class="table-wrap"><table><thead><tr><th>单词本</th><th>词数</th><th>日志</th><th>学习词</th><th>复习词</th><th>状态</th></tr></thead><tbody>${notebookRows}</tbody></table></div></section><section class="card"><h2>学习日志（最多显示最近80条）</h2><div class="table-wrap"><table><thead><tr><th>日期</th><th>单词本</th><th>学习词</th><th>复习词</th><th>计划新词</th><th>希币</th></tr></thead><tbody>${logRows}</tbody></table></div></section><section class="card"><h2>单元计划</h2>${planSummary.length?'<div>'+planSummary.map(x=>`<span class="pill">${esc(x)}</span>`).join('')+'</div>':'<p class="muted">没有读取到 unitPlans。</p>'}<p class="small muted">settings.activeNotebookId：${esc(settings.activeNotebookId??'未设置')}；weeklyPlans：${esc(Object.keys(settings.weeklyPlans||{}).join(', ')||'没有')}</p></section><section class="card"><h2>旧版存储</h2><p>降级存储存在：<strong>${r.fallback.present?'是':'否'}</strong>；旧词条：${n(r.fallback.wordCount)}；旧日志：${n(r.fallback.logCount)}；旧单词本：${n(r.fallback.notebookCount)}</p><p class="small muted">IndexedDB：${r.indexedDB.opened?'已打开':'未打开'}；版本：${esc(r.indexedDB.version??'未知')}；对象仓库：${esc(r.indexedDB.stores.join(', ')||'无')}</p></section><details class="card"><summary>查看安全诊断 JSON</summary><pre>${esc(JSON.stringify(rawSafe,null,2))}</pre></details>`;
+  }
+  $('#refresh').addEventListener('click',read);
+  $('#download').addEventListener('click',()=>{if(!latest)return;const blob=new Blob([JSON.stringify({...latest,settings:safeSettings(latest.settings)},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='xixi-data-diagnostic.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)});
+  read();
+})();
+</script>
+</body>
+</html>
