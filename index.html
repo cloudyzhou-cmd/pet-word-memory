@@ -28,8 +28,11 @@
       --radius: 20px;
     }
     * { box-sizing: border-box; }
-    html { background: var(--bg); }
+    html { width: 100%; max-width: 100%; overflow-x: hidden; background: var(--bg); }
     body {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
       margin: 0;
       color: var(--text);
       background:
@@ -45,8 +48,9 @@
     button { border: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
     button:disabled { cursor: not-allowed; opacity: .48; }
     a { color: inherit; text-decoration: none; }
-    .app-shell { width: 100%; max-width: 1120px; margin: 0 auto; min-height: 100vh; }
-    .screen { width: 100%; max-width: 920px; min-height: 100vh; margin: 0 auto; padding: 20px 18px 112px; }
+    #app, .app-shell { width: 100%; max-width: 100%; min-width: 0; overflow-x: hidden; }
+    .app-shell { max-width: 1120px; margin: 0 auto; min-height: 100vh; }
+    .screen { width: 100%; max-width: 920px; min-width: 0; min-height: 100vh; margin: 0 auto; padding: 20px 18px 112px; overflow-x: hidden; }
     .admin-screen { max-width: 1080px; }
     .topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 4px 0 24px; }
     .brand-lockup { display: flex; align-items: center; gap: 10px; }
@@ -62,11 +66,12 @@
     .muted { color: var(--text-secondary); }
     .small { font-size: 13px; }
     .tiny { font-size: 11px; }
-    .stack { display: grid; gap: 16px; }
-    .row { display: flex; align-items: center; gap: 12px; }
+    .stack { display: grid; gap: 16px; min-width: 0; max-width: 100%; }
+    .row { display: flex; align-items: center; gap: 12px; min-width: 0; max-width: 100%; }
+    .row > * { min-width: 0; }
     .between { justify-content: space-between; }
     .wrap { flex-wrap: wrap; }
-    .card { background: rgba(255,255,255,.94); border: 1px solid rgba(231,234,240,.88); border-radius: var(--radius); box-shadow: var(--shadow); }
+    .card { width: 100%; max-width: 100%; min-width: 0; background: rgba(255,255,255,.94); border: 1px solid rgba(231,234,240,.88); border-radius: var(--radius); box-shadow: var(--shadow); }
     .card-pad { padding: 20px; }
     .hero-card { padding: 22px; background: linear-gradient(145deg, #0c80fa 0%, #386cf0 58%, #6759df 100%); color: white; border: 0; overflow: hidden; position: relative; }
     .hero-card::after { content: ""; width: 170px; height: 170px; position: absolute; right: -46px; top: -66px; border-radius: 50%; border: 24px solid rgba(255,255,255,.10); }
@@ -78,18 +83,34 @@
     .progress-track { height: 9px; background: rgba(255,255,255,.23); border-radius: 999px; overflow: hidden; margin-top: 18px; }
     .progress-fill { height: 100%; background: #fff; border-radius: inherit; transition: width .35s ease; }
     .progress-meta { display: flex; justify-content: space-between; gap: 10px; margin-top: 9px; color: rgba(255,255,255,.76); font-size: 12px; }
-    .task-card { padding: 18px; display: grid; gap: 13px; position: relative; overflow: hidden; }
+    .task-card { width: 100%; max-width: 100%; min-width: 0; padding: 18px; display: grid; gap: 13px; position: relative; overflow: hidden; }
+    .task-card > * { min-width: 0; max-width: 100%; }
     .task-card.new-task { background: linear-gradient(135deg, #ffffff 0%, #f0f8ff 100%); }
     .task-card.review-task { background: linear-gradient(135deg, #ffffff 0%, #fff7e8 100%); }
     .task-card.locked { filter: saturate(.65); }
     .task-icon { width: 50px; height: 50px; display: grid; place-items: center; border-radius: 16px; font-size: 27px; background: rgba(255,255,255,.78); }
     .task-title { font-size: 19px; font-weight: 800; letter-spacing: -.025em; }
     .task-caption { color: var(--text-secondary); font-size: 13px; line-height: 1.6; }
-    .word-preview { color: var(--primary-dark); font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .word-preview {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      color: var(--primary-dark);
+      font-weight: 700;
+      font-size: 14px;
+      line-height: 1.55;
+      white-space: normal;
+      overflow: hidden;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+    }
     .task-status { padding: 6px 10px; border-radius: 999px; background: rgba(52,199,89,.12); color: #1a9c3b; font-size: 12px; font-weight: 800; }
     .task-status.pending { background: rgba(255,149,0,.14); color: #c26d00; }
     .task-status.lock { background: rgba(142,142,147,.13); color: var(--text-secondary); }
-    .btn { min-height: 46px; padding: 11px 17px; border-radius: 13px; font-weight: 750; font-size: 16px; transition: transform .15s ease, box-shadow .15s ease, background .15s ease; display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+    .btn { max-width: 100%; min-width: 0; min-height: 46px; padding: 11px 17px; border-radius: 13px; font-weight: 750; font-size: 16px; line-height: 1.25; white-space: normal; overflow-wrap: anywhere; transition: transform .15s ease, box-shadow .15s ease, background .15s ease; display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
     /* iOS Safari 对 display:none/hidden 的文件输入支持不稳定；让透明输入框直接覆盖按钮。 */
     .file-input-label { position: relative; overflow: hidden; cursor: pointer; }
     .file-input-label input[type="file"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .001; cursor: pointer; font-size: 100px; }
@@ -126,6 +147,14 @@
     .extra-study-card { background: linear-gradient(135deg, #fffdf4 0%, #fff7df 100%); border-color: #ffe0a1; }
     .extra-study-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
     .extra-study-actions .btn { min-width: 0; padding-left: 8px; padding-right: 8px; }
+
+    /* iPad Safari 防横向撑宽：网格和长文本必须允许收缩。 */
+    .hero-card, .coin-hero, .extra-study-card, .weekly-test-card,
+    .section-heading, .progress-meta, .extra-study-actions { min-width: 0; max-width: 100%; }
+    img, canvas, svg { max-width: 100%; }
+    @supports (-webkit-touch-callout: none) {
+      input, textarea, select { font-size: 16px !important; }
+    }
     .word-row { display: grid; grid-template-columns: 45px 1fr auto; align-items: center; gap: 12px; padding: 13px; background: rgba(255,255,255,.9); border: 1px solid var(--border); border-radius: 17px; }
     .word-emoji { width: 45px; height: 45px; display: grid; place-items: center; border-radius: 14px; background: #f3f6fa; font-size: 25px; overflow: hidden; }
     .word-emoji img { width: 100%; height: 100%; object-fit: cover; }
@@ -332,7 +361,7 @@
     ];
     /* 内置词库由用户提供的 PET 强化班 Markdown 资料整理而来。实际内容在此处内嵌，更新网页无需联网补全。 */
     const PET_STRENGTH_BOOK_NAME = 'PET强化单词';
-    const APP_VERSION = '1.5.0';
+    const APP_VERSION = '1.5.1';
     /* 应用版本和数据结构版本严格分离：功能更新不应重建用户数据。 */
     const DATA_SCHEMA_VERSION = 3;
     const PET_STRENGTH_DATA_VERSION = 'pet-strength-unit-7-12-v1.2';
