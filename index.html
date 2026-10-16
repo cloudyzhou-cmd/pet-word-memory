@@ -361,7 +361,7 @@
     ];
     /* 内置词库由用户提供的 PET 强化班 Markdown 资料整理而来。实际内容在此处内嵌，更新网页无需联网补全。 */
     const PET_STRENGTH_BOOK_NAME = 'PET强化单词';
-    const APP_VERSION = '1.5.1';
+    const APP_VERSION = '1.5.2';
     /* 应用版本和数据结构版本严格分离：功能更新不应重建用户数据。 */
     const DATA_SCHEMA_VERSION = 3;
     const PET_STRENGTH_DATA_VERSION = 'pet-strength-unit-7-12-v1.2';
@@ -1103,7 +1103,15 @@
     async function markSelfKnown(known) { const word = currentWord(); const patch = known ? { lastReview: Date.now() } : { status: 'struggling', errorCount: (word.errorCount || 0) + 1, lastReview: Date.now(), nextReview: tomorrowStart() }; if (!known) await Scheduler.updateWord(word, patch); State.currentTask.selfKnown = known; if (State.currentTask.stage === 'R') { State.currentTask.stage = 'C'; State.spell = null; renderLearning(); } else { State.currentTask.stage = 'B'; State.stageAFlipped = true; State.stageB = null; renderLearning(); } }
     async function finishWord() { const word = currentWord(); const wasReview = State.currentTask.type === 'review'; let patch = { lastReview: Date.now(), reviewCount: (word.reviewCount || 0) + (wasReview ? 1 : 0), nextReview: Scheduler.calculateNextReview(word, true) }; if (!wasReview) patch = { ...patch, status: word.status === 'struggling' || State.currentTask.spellAttempts >= 3 ? 'struggling' : (State.currentTask.selfKnown ? 'learning' : 'struggling'), nextReview: tomorrowStart() }; else if (word.status === 'struggling') { patch = { ...patch, status: (word.successfulReviewStreak || 0) + 1 >= 2 ? 'learning' : 'struggling', successfulReviewStreak: (word.successfulReviewStreak || 0) + 1 }; } else if (word.status === 'learning') { const correctStreak = (word.correctStreak || 0) + 1; patch = { ...patch, correctStreak, status: correctStreak >= 3 ? 'mastered' : 'learning', nextReview: correctStreak >= 3 ? Date.now() + 3 * 86400000 : tomorrowStart(), masteredInterval: 3 }; } else if (word.status === 'mastered') { patch = { ...patch, status: 'mastered' }; }
       await Scheduler.updateWord(word, patch); const log = currentLog() || { date: State.today, wordsStudied: [], wordsReviewed: [], durationMinutes: 0, plannedNew: [], plannedReview: [] }; const key = wasReview ? 'wordsReviewed' : 'wordsStudied'; log[key] = unique([...(log[key] || []), word.id]); log.durationMinutes = Math.max(log.durationMinutes || 0, Math.round((Date.now() - (State.currentTask.startedAt || Date.now())) / 60000)); const complete = (log.wordsStudied || []).length >= (log.plannedNew || []).length && (log.wordsReviewed || []).length >= (log.plannedReview || []).length; log.completed = complete; await DB.put('dailyLog', log); State.logs = await DB.all('dailyLog'); State.spell.success = true; renderLearning(); if (complete) setTimeout(() => { Animations.confetti(); showToast('今日完成！明天见 🌟'); }, 450); }
-    function nextWord() { State.currentTask = null; State.stageB = null; State.spell = null; if (State.route !== '/learn') Router.navigate('/learn'); else { render(); } }
+    async function nextWord() {
+      State.currentTask = null;
+      State.stageB = null;
+      State.spell = null;
+      /* 每完成一个词都重新检查单元进度。30词学完后立即建立下一单元，测试不再阻塞学习。 */
+      await ensureDailyLog();
+      if (State.route !== '/learn') Router.navigate('/learn');
+      else render();
+    }
     function exitLearning() { if (confirm('确定要退出本轮学习吗？已经完成的单词会被保留。')) { State.currentTask = null; State.reviewFlow = null; State.stageB = null; State.spell = null; render(); } }
 
     /* ==================== 家长后台 ==================== */
@@ -3525,7 +3533,10 @@
       const plans = unitPlansV13(numericBookId);
       let changed = false;
       for (const plan of plans) {
-        if (Number(plan.testAttempts || 0) >= 1 && plan.status !== 'completed') {
+        const progress = unitPlanProgressV13(plan, numericBookId);
+        const studyCompleted = progress.total === UNIT_PLAN_SIZE_V13 && progress.completed >= UNIT_PLAN_SIZE_V13;
+        /* 单元是否完成只看30个词是否学完，不再等待第一次测试。 */
+        if ((studyCompleted || Number(plan.testAttempts || 0) >= 1) && plan.status !== 'completed') {
           plan.status = 'completed';
           changed = true;
         }
@@ -3572,7 +3583,9 @@
         const history = new Set(plans.flatMap(plan => plan.wordIds || []));
         /* 没有旧单元计划时，跳过历史上已经学过的词，避免升级后重新回到 Lesson 1。 */
         const remaining = ordered.filter(word => !history.has(word.id) && !historicalStudied.has(word.id));
-        const manualWords = manualIndex >= 0 ? ordered.slice(manualIndex, manualIndex + UNIT_PLAN_SIZE_V13) : [];
+        /* 手动起点只用于建立一次计划；后续单元必须继续往后，不能反复回到同一 Lesson。 */
+        const manualStartAlreadyUsed = Boolean(manualKey) && plans.some(plan => plan.startPointKey === manualKey);
+        const manualWords = manualIndex >= 0 && !manualStartAlreadyUsed ? ordered.slice(manualIndex, manualIndex + UNIT_PLAN_SIZE_V13) : [];
         const source = manualWords.length ? manualWords : remaining;
         if (source.length) {
           const first = source[0];
@@ -3664,7 +3677,7 @@
       await ensureActiveUnitV13(State.activeNotebookId);
       await ensureDailyLog();
       Router.navigate('/learn');
-      setTimeout(() => { Animations.confetti(); showToast('单元测试完成！下一个单元已经开放 🌟'); }, 350);
+      setTimeout(() => { Animations.confetti(); showToast('单元测试完成！成绩已经记录 🌟'); }, 350);
     }
     function unitTestAdvanceV13() {
       const test = State.unitTest;
@@ -3727,16 +3740,20 @@
     renderWeeklyTestCard = function() {
       const plan = activeUnitPlanV13(State.activeNotebookId);
       const progress = unitPlanProgressV13(plan, State.activeNotebookId);
-      const pending = retestableUnitPlansV13(State.activeNotebookId);
-      let html = '';
       const display = plan ? unitPlanDisplayV13(plan, State.activeNotebookId) : null;
-      if (plan && progress.total === UNIT_PLAN_SIZE_V13 && progress.completed >= UNIT_PLAN_SIZE_V13 && Number(plan.testAttempts || 0) === 0) {
-        html += '<section class="card card-pad weekly-test-card"><div class="row between"><div><div class="eyebrow" style="color:var(--warning)">单元测试</div><h3 style="margin-top:7px">' + escapeHtml(display.range) + ' 已学完</h3><p class="muted small" style="margin-top:6px">30个单词已经完成，现在可以进行第一次测试。</p></div><div style="font-size:38px">📝</div></div><button class="btn btn-warning btn-block" style="margin-top:16px" data-action="unit-test-start" data-plan-id="' + escapeHtml(plan.id) + '">开始单元测试 →</button></section>';
-      } else if (plan && progress.total === UNIT_PLAN_SIZE_V13 && progress.completed < UNIT_PLAN_SIZE_V13) {
-        html += '<section class="card card-pad"><div class="eyebrow">当前单元</div><h3 style="margin-top:7px">' + escapeHtml(display.range) + '</h3><p class="muted small" style="margin-top:6px">' + escapeHtml(display.current) + '；完成当前单元30个单词后，单元测试会自动开放。</p></section>';
+      const pendingTests = unitPlansV13(State.activeNotebookId).filter(item => {
+        const itemProgress = unitPlanProgressV13(item, State.activeNotebookId);
+        return itemProgress.total === UNIT_PLAN_SIZE_V13 && itemProgress.completed >= UNIT_PLAN_SIZE_V13 && Number(item.testAttempts || 0) < UNIT_TEST_MAX_ATTEMPTS_V13;
+      });
+      let html = '';
+      if (plan && progress.total === UNIT_PLAN_SIZE_V13 && progress.completed < UNIT_PLAN_SIZE_V13) {
+        html += '<section class="card card-pad"><div class="eyebrow">当前单元</div><h3 style="margin-top:7px">' + escapeHtml(display.range) + '</h3><p class="muted small" style="margin-top:6px">' + escapeHtml(display.current) + '；完成30个单词后会自动进入下一单元。</p></section>';
       }
-      if (pending.length) {
-        html += '<section class="card card-pad"><details><summary style="cursor:pointer;font-weight:800;color:var(--primary)">待重测单元（' + pending.length + '）</summary><div class="stack" style="margin-top:13px">' + pending.map(item => '<div class="row between wrap" style="gap:10px"><div><strong>' + escapeHtml(unitPlanDisplayV13(item, State.activeNotebookId).range) + '</strong><div class="muted tiny" style="margin-top:4px">已测试 ' + Number(item.testAttempts || 0) + '/2 次，还可以重测1次</div></div><button class="btn btn-secondary" data-action="unit-test-start" data-plan-id="' + escapeHtml(item.id) + '">再测一次</button></div>').join('') + '</div></details></section>';
+      if (pendingTests.length) {
+        html += '<section class="card card-pad"><details><summary style="cursor:pointer;font-weight:800;color:var(--primary)">可选单元测试（' + pendingTests.length + '）</summary><p class="muted tiny" style="margin-top:8px">测试可以稍后完成，不影响当前单元的新词学习。</p><div class="stack" style="margin-top:13px">' + pendingTests.map(item => {
+          const attempts = Number(item.testAttempts || 0);
+          return '<div class="row between wrap" style="gap:10px"><div><strong>' + escapeHtml(unitPlanDisplayV13(item, State.activeNotebookId).range) + '</strong><div class="muted tiny" style="margin-top:4px">已测试 ' + attempts + '/2 次</div></div><button class="btn ' + (attempts ? 'btn-secondary' : 'btn-warning') + '" data-action="unit-test-start" data-plan-id="' + escapeHtml(item.id) + '">' + (attempts ? '再测一次' : '开始测试') + '</button></div>';
+        }).join('') + '</div></details></section>';
       }
       return html;
     };
@@ -3769,7 +3786,7 @@
       const html = previousRenderDashboardV15();
       return html.replace('</header><div class="stack">', '</header><div class="stack">' + renderLearningPositionCardV15(State.activeNotebookId));
     };
-    window.__XIXI_UNIT_PLAN__ = { version: '1.5.0', size: UNIT_PLAN_SIZE_V13, getActive: () => activeUnitPlanV13(), getPlans: () => unitPlansV13(), getProgress: plan => unitPlanProgressV13(plan), getDisplay: plan => unitPlanDisplayV13(plan) };
+    window.__XIXI_UNIT_PLAN__ = { version: '1.5.2', size: UNIT_PLAN_SIZE_V13, getActive: () => activeUnitPlanV13(), getPlans: () => unitPlansV13(), getProgress: plan => unitPlanProgressV13(plan), getDisplay: plan => unitPlanDisplayV13(plan) };
     document.addEventListener('input', event => {
       if (event.target?.dataset?.input === 'unit-spell' && State.unitTest) {
         State.unitTest.spellValue = event.target.value;
@@ -3857,7 +3874,7 @@
         }
       }
     }, true);
-    window.__XIXI_WEEK_PLAN__ = { version: '1.5.0', size: UNIT_PLAN_SIZE_V13, getPlan: () => activeUnitPlanV13(), getProgress: () => unitPlanProgressV13(activeUnitPlanV13()) };
+    window.__XIXI_WEEK_PLAN__ = { version: '1.5.2', size: UNIT_PLAN_SIZE_V13, getPlan: () => activeUnitPlanV13(), getProgress: () => unitPlanProgressV13(activeUnitPlanV13()) };
     window.__XIXI_IMPORT_ENGINE__={version:IMPORT_ENGINE_VERSION,appVersion:APP_VERSION,parseBatchInput,extractVocabularyFromOcr,missingBatchFields,referenceDataFor,compareCourseOrder};
 
     init();
