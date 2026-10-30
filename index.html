@@ -362,7 +362,7 @@
     ];
     /* 内置词库由用户提供的 PET 强化班 Markdown 资料整理而来。实际内容在此处内嵌，更新网页无需联网补全。 */
     const PET_STRENGTH_BOOK_NAME = 'PET强化单词';
-    const APP_VERSION = '1.6.2';
+    const APP_VERSION = '1.6.3';
     /* 应用版本和数据结构版本严格分离：功能更新不应重建用户数据。 */
     const DATA_SCHEMA_VERSION = 3;
     /* V1.6.2 一次性数据补偿：累计完成190词，希币至少补到190；不重复赠送，也不覆盖更高余额。 */
@@ -3671,8 +3671,35 @@
     function retestableUnitPlansV13(bookId = State.activeNotebookId) {
       return unitPlansV13(bookId).filter(plan => Number(plan.testAttempts || 0) === 1);
     }
-    function unitTestWordsV13(test) {
-      return (test?.ids || []).map(id => State.words.find(word => word.id === id)).filter(Boolean);
+    /** 返回当前测试阶段的动态题目队列。原始30题之外可插入一次错题巩固。 */
+    function unitTestItemsV163(test, stage = test?.stage) {
+      if (!test) return [];
+      const key = stage === 'spelling' ? 'spellingItems' : 'meaningItems';
+      if (!Array.isArray(test[key])) test[key] = (test.ids || []).map(id => ({ id, isRetry: false }));
+      return test[key];
+    }
+    function currentUnitTestItemV163(test) {
+      return unitTestItemsV163(test)[test?.index || 0] || null;
+    }
+    function currentUnitTestWordV163(test) {
+      const item = currentUnitTestItemV163(test);
+      return item ? State.words.find(word => word.id === item.id) : null;
+    }
+    /**
+     * 将首次做错或使用提示的词插到3道其他题之后；同一阶段、同一单词最多巩固一次。
+     */
+    function scheduleUnitRetryV163(test, stage, wordId) {
+      if (!test || !wordId) return false;
+      const item = currentUnitTestItemV163(test);
+      if (item?.isRetry) return false;
+      const scheduledKey = stage === 'spelling' ? 'spellingRetryScheduled' : 'meaningRetryScheduled';
+      test[scheduledKey] = Array.isArray(test[scheduledKey]) ? test[scheduledKey] : [];
+      if (test[scheduledKey].includes(wordId)) return false;
+      const items = unitTestItemsV163(test, stage);
+      const insertAt = Math.min((test.index || 0) + 4, items.length);
+      items.splice(insertAt, 0, { id: wordId, isRetry: true });
+      test[scheduledKey].push(wordId);
+      return true;
     }
     function makeUnitEnglishChoicesV13(word, plan) {
       const answer = String(word.word || '').trim();
@@ -3686,11 +3713,13 @@
       return shuffle(choices.slice(0, 4));
     }
     function unitTestProgressLabelV13(test) {
-      return (test.stage === 'meaning' ? '第一步 · 中文选英文' : '第二步 · 拼写英文') + ' · ' + (test.index + 1) + ' / ' + test.ids.length;
+      const items = unitTestItemsV163(test);
+      return (test.stage === 'meaning' ? '第一步 · 中文选英文' : '第二步 · 拼写英文') + ' · ' + (test.index + 1) + ' / ' + items.length;
     }
     function renderUnitTestV13() {
       const test = State.unitTest;
-      const word = unitTestWordsV13(test)[test?.index || 0];
+      const item = currentUnitTestItemV163(test);
+      const word = currentUnitTestWordV163(test);
       if (!test || !word) return '<section class="screen"><div class="card card-pad" style="margin-top:25vh;text-align:center"><div style="font-size:54px">📝</div><h2 style="margin-top:13px">单元测试</h2><p class="muted" style="margin-top:9px">请从学习首页进入单元测试。</p><button type="button" class="btn btn-primary btn-block" style="margin-top:18px" data-action="navigate" data-path="/learn">返回首页</button></div></section>';
       const plan = unitPlanByIdV13(test.planId, State.activeNotebookId);
       const planDisplay = unitPlanDisplayV13(plan, State.activeNotebookId);
@@ -3703,13 +3732,15 @@
           return '<button type="button" class="quiz-option ' + cls + '" data-action="unit-test-meaning-answer" data-choice="' + escapeHtml(choice) + '"><span class="option-letter">' + String.fromCharCode(65 + index) + '</span><span>' + escapeHtml(choice) + '</span>' + (test.correct === true && correct ? '<span style="margin-left:auto">✓</span>' : '') + '</button>';
         }).join('');
         const feedback = test.correct === true ? '回答正确！继续下一个单词。' : test.correct === false ? '再想想 💡 请选择正确的英文单词。' : '请选择与中文意思对应的英文单词';
-        const nextLabel = test.index === test.ids.length - 1 ? '进入拼写阶段 →' : '下一个 →';
-        return '<section class="screen"><div class="learn-top exit-row"><button type="button" class="btn btn-ghost" data-action="unit-test-exit">← 退出</button><span class="step-label">' + escapeHtml(planDisplay.range || '单元测试') + ' · 理解</span><span class="badge orange">' + progress + '</span></div><article class="card quiz-card"><div class="eyebrow">第一项：中文选英文</div><h2 style="margin-top:8px">' + escapeHtml(word.meaning) + ' 对应哪个英文单词？</h2><div class="quiz-visual">' + visualBlock(word, 'visual-word') + '</div><div class="quiz-options">' + options + '</div><div class="quiz-feedback ' + (test.correct === true ? 'feedback-good' : test.correct === false ? 'feedback-bad' : '') + '">' + feedback + '</div>' + (test.correct === true ? '<button type="button" class="btn btn-primary btn-block" style="margin-top:12px" data-action="unit-test-meaning-continue">' + nextLabel + '</button>' : '') + '</article></section>';
+        const nextLabel = test.index === unitTestItemsV163(test).length - 1 ? '进入拼写阶段 →' : '下一个 →';
+        const retryBadge = item?.isRetry ? '<span class="badge orange" style="margin-left:8px">巩固题</span>' : '';
+        return '<section class="screen"><div class="learn-top exit-row"><button type="button" class="btn btn-ghost" data-action="unit-test-exit">← 退出</button><span class="step-label">' + escapeHtml(planDisplay.range || '单元测试') + ' · 理解' + retryBadge + '</span><span class="badge orange">' + progress + '</span></div><article class="card quiz-card"><div class="eyebrow">第一项：中文选英文</div><h2 style="margin-top:8px">' + escapeHtml(word.meaning) + ' 对应哪个英文单词？</h2><div class="quiz-visual">' + visualBlock(word, 'visual-word') + '</div><div class="quiz-options">' + options + '</div><div class="quiz-feedback ' + (test.correct === true ? 'feedback-good' : test.correct === false ? 'feedback-bad' : '') + '">' + feedback + '</div>' + (test.correct === true ? '<button type="button" class="btn btn-primary btn-block" style="margin-top:12px" data-action="unit-test-meaning-continue">' + nextLabel + '</button>' : '') + '</article></section>';
       }
       const answer = normalizeSpellDisplay(word.word);
       const hintText = test.spellHintCount === 1 ? '提示：首字母是“' + word.word[0] + '”，共 ' + answer.length + ' 个字母。' : test.spellHintCount >= 2 ? '正确拼写是“' + word.word + '”。' : '';
       const spellingBlock = test.spellCorrect ? '<div class="success-icon" style="font-size:55px">✅</div><h3 style="text-align:center;color:var(--success);margin-top:8px">拼写正确</h3><button type="button" class="btn btn-success btn-block" style="margin-top:20px" data-action="unit-test-next">下一个 →</button>' : '<input class="input spell-input ' + (test.spellError ? 'error' : '') + '" data-input="unit-spell" data-spell-guard="true" value="' + escapeHtml(test.spellValue) + '" autocomplete="off" autocapitalize="none" spellcheck="false" inputmode="latin" placeholder="输入英文单词或词组" aria-label="单元测试拼写答案"><div class="row" style="gap:10px;margin-top:14px"><button type="button" class="btn btn-secondary" style="flex:1" data-action="unit-test-hint" ' + (test.spellHintCount >= 2 ? 'disabled' : '') + '>💡 提示 ' + (test.spellHintCount ? '(' + test.spellHintCount + '/2)' : '') + '</button><button type="button" class="btn btn-primary" style="flex:1" data-action="unit-test-check-spell">检查拼写</button></div>' + (hintText ? '<div class="hint-box">💡 ' + escapeHtml(hintText) + '</div>' : '') + (test.spellError ? '<div class="compare">' + compareSpelling(test.spellValue, answer) + '</div><div class="feedback-bad" style="text-align:center;margin-top:11px;font-weight:800">还差一点，再试一次。</div>' : '<div class="muted tiny" style="text-align:center;margin-top:13px">必须拼写正确才能通过这个词。</div>');
-      return '<section class="screen"><div class="learn-top exit-row"><button type="button" class="btn btn-ghost" data-action="unit-test-exit">← 退出</button><span class="step-label">' + escapeHtml(planDisplay.range || '单元测试') + ' · 拼写</span><span class="badge orange">' + progress + '</span></div><article class="card spell-card"><div class="eyebrow">第二项：中文拼写英文</div><h2 style="margin-top:8px;text-align:center">请根据中文意思拼写英文</h2><div class="spell-prompt"><div class="meaning-large">' + escapeHtml(word.meaning) + '</div>' + (word.exampleEn ? '<div class="spell-example">' + highlightBlank(word.exampleEn, word.word) + '</div>' : '') + '</div>' + spellingBlock + '</article></section>';
+      const retryBadge = item?.isRetry ? '<span class="badge orange" style="margin-left:8px">巩固题</span>' : '';
+      return '<section class="screen"><div class="learn-top exit-row"><button type="button" class="btn btn-ghost" data-action="unit-test-exit">← 退出</button><span class="step-label">' + escapeHtml(planDisplay.range || '单元测试') + ' · 拼写' + retryBadge + '</span><span class="badge orange">' + progress + '</span></div><article class="card spell-card"><div class="eyebrow">第二项：中文拼写英文</div><h2 style="margin-top:8px;text-align:center">请根据中文意思拼写英文</h2><div class="spell-prompt"><div class="meaning-large">' + escapeHtml(word.meaning) + '</div>' + (word.exampleEn ? '<div class="spell-example">' + highlightBlank(word.exampleEn, word.word) + '</div>' : '') + '</div>' + spellingBlock + '</article></section>';
     }
     async function startUnitTestV13(planId) {
       const plan = unitPlanByIdV13(planId, State.activeNotebookId);
@@ -3717,7 +3748,8 @@
       const progress = unitPlanProgressV13(plan, State.activeNotebookId);
       if (!progress.total || progress.completed < progress.total) { showToast('请先完成本课的全部单词'); return; }
       if (Number(plan.testAttempts || 0) >= UNIT_TEST_MAX_ATTEMPTS_V13) { showToast('这个单元已经完成2次测试'); return; }
-      State.unitTest = { planId: plan.id, ids: plan.wordIds.slice(), index: 0, stage: 'meaning', choices: null, selected: null, correct: null, meaningScore: 0, spellingScore: 0, spellingAttempts: 0, spellHintCount: 0, spellValue: '', spellError: false, spellCorrect: false, attemptNumber: Number(plan.testAttempts || 0) + 1 };
+      const ids = plan.wordIds.slice();
+      State.unitTest = { planId: plan.id, ids, meaningItems: ids.map(id => ({ id, isRetry: false })), spellingItems: ids.map(id => ({ id, isRetry: false })), meaningRetryScheduled: [], spellingRetryScheduled: [], index: 0, stage: 'meaning', choices: null, selected: null, correct: null, meaningHadError: false, meaningScore: 0, spellingScore: 0, spellingAttempts: 0, spellHintCount: 0, spellValue: '', spellError: false, spellCorrect: false, attemptNumber: Number(plan.testAttempts || 0) + 1 };
       Router.navigate('/test');
     }
     async function completeUnitTestV13() {
@@ -3742,14 +3774,15 @@
     function unitTestAdvanceV13() {
       const test = State.unitTest;
       if (!test || test.correct !== true && test.stage === 'meaning') return;
+      const items = unitTestItemsV163(test);
       if (test.stage === 'meaning') {
-        if (test.index + 1 >= test.ids.length) { test.stage = 'spelling'; test.index = 0; }
+        if (test.index + 1 >= items.length) { test.stage = 'spelling'; test.index = 0; }
         else test.index++;
       } else {
-        if (test.index + 1 >= test.ids.length) { void completeUnitTestV13(); return; }
+        if (test.index + 1 >= items.length) { void completeUnitTestV13(); return; }
         test.index++;
       }
-      test.choices = null; test.selected = null; test.correct = null; test.spellingAttempts = 0; test.spellHintCount = 0; test.spellValue = ''; test.spellError = false; test.spellCorrect = false; render();
+      test.choices = null; test.selected = null; test.correct = null; test.meaningHadError = false; test.spellingAttempts = 0; test.spellHintCount = 0; test.spellValue = ''; test.spellError = false; test.spellCorrect = false; render();
     }
     currentLog = function() {
       return State.logs.find(log => log.date === State.today && sameNotebookLogV13(log, State.activeNotebookId)) || null;
@@ -3884,7 +3917,7 @@
       const html = previousRenderDashboardV15();
       return html.replace('</header><div class="stack">', '</header><div class="stack">' + renderLearningPositionCardV15(State.activeNotebookId));
     };
-    window.__XIXI_UNIT_PLAN__ = { version: '1.6.2', size: UNIT_PLAN_SIZE_V13, getActive: () => activeUnitPlanV13(), getPlans: () => unitPlansV13(), getProgress: plan => unitPlanProgressV13(plan), getDisplay: plan => unitPlanDisplayV13(plan) };
+    window.__XIXI_UNIT_PLAN__ = { version: '1.6.3', size: UNIT_PLAN_SIZE_V13, getActive: () => activeUnitPlanV13(), getPlans: () => unitPlansV13(), getProgress: plan => unitPlanProgressV13(plan), getDisplay: plan => unitPlanDisplayV13(plan) };
     document.addEventListener('input', event => {
       if (event.target?.dataset?.input === 'unit-spell' && State.unitTest) {
         State.unitTest.spellValue = event.target.value;
@@ -3901,13 +3934,19 @@
       if (action === 'unit-test-start') { await startUnitTestV13(target.dataset.planId); return; }
       if (action === 'unit-test-exit') { if (confirm('确定退出本次单元测试吗？已经完成的学习记录会保留。')) { State.unitTest = null; Router.navigate('/learn'); } return; }
       const test = State.unitTest;
-      const word = unitTestWordsV13(test)[test?.index || 0];
+      const item = currentUnitTestItemV163(test);
+      const word = currentUnitTestWordV163(test);
       if (!test || !word) return;
       if (action === 'unit-test-meaning-answer') {
         if (test.stage !== 'meaning' || test.correct === true) return;
         test.selected = target.dataset.choice || '';
         test.correct = test.selected === word.word;
-        if (test.correct) test.meaningScore++;
+        if (test.correct) {
+          if (!item?.isRetry && !test.meaningHadError) test.meaningScore++;
+          if (test.meaningHadError) scheduleUnitRetryV163(test, 'meaning', word.id);
+        } else {
+          test.meaningHadError = true;
+        }
         render();
         return;
       }
@@ -3925,7 +3964,8 @@
         if (input) test.spellValue = input.value;
         if (normalizeSpellDisplay(test.spellValue) === normalizeSpellDisplay(word.word)) {
           test.spellCorrect = true;
-          if (test.spellingAttempts === 0) test.spellingScore++;
+          if (!item?.isRetry && test.spellingAttempts === 0 && test.spellHintCount === 0) test.spellingScore++;
+          if (test.spellingAttempts > 0 || test.spellHintCount > 0) scheduleUnitRetryV163(test, 'spelling', word.id);
         } else {
           test.spellingAttempts++;
           test.spellError = true;
@@ -3973,9 +4013,9 @@
         }
       }
     }, true);
-    window.__XIXI_WEEK_PLAN__ = { version: '1.6.2', size: UNIT_PLAN_SIZE_V13, getPlan: () => activeUnitPlanV13(), getProgress: () => unitPlanProgressV13(activeUnitPlanV13()) };
+    window.__XIXI_WEEK_PLAN__ = { version: '1.6.3', size: UNIT_PLAN_SIZE_V13, getPlan: () => activeUnitPlanV13(), getProgress: () => unitPlanProgressV13(activeUnitPlanV13()) };
     window.__XIXI_REVIEW_PLAN__ = {
-      version: '1.6.2',
+      version: '1.6.3',
       getSummary: () => {
         const log = currentLog();
         const previousIds = latestCompletedBaseSessionIdsV162(State.activeNotebookId);
